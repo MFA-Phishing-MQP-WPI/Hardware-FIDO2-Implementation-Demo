@@ -13,6 +13,9 @@ import string
 import random
 from enum import Enum
 from typing import Optional, List, Dict
+from display import Colors
+
+console: Colors = Colors(display=True)
 
 class ConnectionAction(Enum):
     Login = 1
@@ -20,6 +23,7 @@ class ConnectionAction(Enum):
     Update_Password = 3
     Update_MFA = 4
     Close_Connection = 5
+    CreateNewAccount = 6
 
 class YubiKeyResponse:
     signature: bytes
@@ -32,13 +36,15 @@ class YubiKey:
             secret = YubiKey._gen_secret(print_fun=True)
         self._device_secret: bytes = secret
         self.ID: str = get_rand_id(12)
+        console.log('YubiKey').print(f'   $YK({self.ID}): initializing for the first time...')
+        time.sleep(1)
     
     def register_account(self, RP_ID, account):
         pass
 
     def _generate_key_pair(self, rp_id, account_info, print_debug=False):
         display = print if print_debug else void
-        display(f' $YubiKey({self.ID}) Generating key pair inside YubiKey...')
+        display(f'   $TK({self.ID}) Generating key pair inside YubiKey...')
         secret_material = self._device_secret + rp_id.encode('utf-8') + account_info.encode('utf-8')
         display(f"       1.     Known: {rp_id=}, {account_info=}, {self._device_secret=}")
         display(f'          Concat to get secret material: {secret_material}\n')
@@ -87,15 +93,15 @@ class YubiKey:
     @staticmethod
     def _gen_secret(print_fun=False) -> bytes:
         secret = os.urandom(32)
-        print("No secret specified. Generating random secret", end='\r')
+        console.log('YubiKey').print("No secret specified. Generating random secret", end='\r')
         time.sleep(0.3)
-        print("No secret specified. Generating random secret.", end='\r')
+        console.log('YubiKey').print("No secret specified. Generating random secret.", end='\r')
         time.sleep(0.21)
-        print("No secret specified. Generating random secret..", end='\r')
+        console.log('YubiKey').print("No secret specified. Generating random secret..", end='\r')
         time.sleep(0.28)
-        print("No secret specified. Generating random secret...", end='\r')
+        console.log('YubiKey').print("No secret specified. Generating random secret...", end='\r')
         time.sleep(0.47)
-        print(f"No secret specified. Generating random secret   {secret}")
+        console.log('YubiKey').print(f"No secret specified. Generating random secret   {secret}")
         return secret
     
 class Account:
@@ -146,9 +152,38 @@ class RelyingParty:
         self.accounts: Dict[str, Account] = {}
         self._longest_account_length = len('Username')  # used for displaying in table
         self.tokens = {}
+        self.INDENT = "     "
+        console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name}): initializing for the first time...')
+        time.sleep(1)
 
     def number_of_accounts(self):
         return len(self.accounts)
+
+    def create_new_account(self):
+        console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name}): WELCOME NEW USER TO {self.name.capitalize()}!')
+        console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name}): Let\'s create a new account!')
+        time.sleep(1)
+        console.log('RelyingParty').post()
+        username = input(f'{self.INDENT}$RP({self.name}): Enter your username > {Colors.CLEAR}')
+        console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name}): Enter your password {Colors.CLEAR}', end='')
+        password = getpass.getpass(prompt='')
+        console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name}): Confirm your password {Colors.CLEAR}', end='')
+        if password != getpass.getpass(prompt=''):
+            console.clear()
+            console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name})::ERR - Passwords do not match.')
+            return
+        console.clear()
+        self.add_account(username, password)
+        console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name})::WARNING ACCOUNT {username.upper()} DOES NOT HAVE 2FA CONFIGURED')
+        console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name}): Account {username} created successfully!')
+        self.show_table_question()
+
+    def show_table_question(self):
+        console.log('RelyingParty').post()
+        if input(f'{self.INDENT}$RP({self.name}): show table of all users (Y/n)? {Colors.CLEAR}').lower() in ['y', 'yes']:
+            console.clear()
+            self.display_table()
+        console.clear()
 
     def _add_token(self, account, token):
         if account not in self.tokens.keys():
@@ -175,14 +210,14 @@ class RelyingParty:
     def display_table(self):
         print(f"\nRelying Party '{self.name}' accounts table:")
         dotted_line = '-' * (self._longest_account_length + 2)
-        seper = f'|{dotted_line}|---------------------------------|------------|'
+        seper = f'|{dotted_line}|---------------------------------|----------------|'
         print('_' * len(seper))
-        print('| ' + 'Username'.center(self._longest_account_length) + ' |          Password Hash          | Public Key |')
+        print('| ' + 'Username'.center(self._longest_account_length) + ' |          Password Hash          | MFA Public Key |')
         print(seper)
         for account_name, account in self.accounts.items():
             username = account_name.center(self._longest_account_length)
             password_hash = f'0x{account.password_hash.hex()}'[:28] + '...'
-            public_key = '  Exists  ' if account.public_key else '   None   '
+            public_key = '    Exists    ' if account.public_key else '     None     '
             print(f'| {username} | {password_hash} | {public_key} |')
         print('‾' * len(seper))
     def _generate_token(self, account: str, hours: float, auth_type: str) -> bytes:
@@ -252,7 +287,7 @@ class RelyingParty:
         if not TK:
             raise ValueError('Permission denied - token not found or expired')
         nonce = os.urandom(32)
-        print(f' ${self.name}: generating challenge for usr="{username}", YubiKey({ykID})')
+        console.log('RelyingParty').print(f'     $RP({self.name}): generating challenge for usr="{username}", YubiKey({ykID})')
         return Challenge(
             self.name,
             username,
@@ -268,8 +303,8 @@ class RelyingParty:
 
 class Connection:
     def __init__(self, client: 'Client', website: RelyingParty, UI_ptr: 'UserInterface'):
-        self.client = client
-        self.website = website
+        self.client: Client = client
+        self.website: RelyingParty = website
         self.session_token: Optional[SessionToken] = None
         self.UI_ptr: UserInterface = UI_ptr
 
@@ -286,8 +321,11 @@ class Client:
     def __init__(self, name='Chome.exe'):
         self.name = name
         self.websites: Dict[str, RelyingParty] = {}
+        console.log('Client').print(f'   $Client({self.name}): initializing for the first time...')
+        time.sleep(1)
 
     def connect(self, website, UI_ptr) -> Connection:
+        console.log('Client').print(f'   $Client({self.name}): attempting to connect to "{website}"')
         if website not in self.websites:
             self.websites[website] = RelyingParty(website)
         return Connection(self, self.websites[website], UI_ptr)
@@ -300,53 +338,58 @@ class Client:
         web_name = connection.website
         RP = self.websites[web_name]
         if RP.number_of_accounts == 0:
-            print(f' $Client({self.name}) ERR: No accounts found for "{web_name}". Create an account first.')
+            console.log('Client').print(f'   $Client({self.name}) ERR: No accounts found for "{web_name}". Create an account first.')
             return False
         while True:
-            username = input(f' $Client({self.name}): Enter username > ')
-            password = getpass.getpass(prompt=f' ${RP.name}: Enter password > ')
+            console.log('Client').post()
+            username = input(f'   $Client({self.name}): Enter username > {Colors.CLEAR}')
+            console.log('Client').print(f'   $Client({self.name}): Enter password > {Colors.CLEAR}', end='')
+            password = getpass.getpass()
             session_token: Optional[bytes] = RP.grant_session_token_1FA(username, password)
             if not session_token: 
-                print(f' ${RP.name}: Username or Password incorrect. Access denied. (1FA Fail)')
-                if input(f' $Client({self.name}): Try again? (Y/n) > ').lower() in ['y', 'yes']:
+                console.log('RelyingParty').print(f'     $RP({RP.name}): Username or Password incorrect. Access denied. (1FA Fail)')
+                console.log('RelyingParty').post()
+                if input(f'   $Client({self.name}): Try again? (Y/n) > {Colors.CLEAR}').lower() in ['y', 'yes']:
+                    console.clear()
                     continue
+                console.clear()
                 return False
             break
         if RP.requires_2FA(username):
-            print(f' ${RP.name}: usr="{username}" requires 2FA...')
-            print(f' ${RP.name}: insert and auth using YubiKey for the respective account.')
+            console.log('RelyingParty').print(f'     $RP({RP.name}): usr="{username}" requires 2FA...')
+            console.log('RelyingParty').print(f'     $RP({RP.name}): insert and auth using YubiKey for the respective account.')
             ykID: Optional[int] = connection.request_yubikey_insert_from_OS()
             if not ykID:
-                print(f' ${RP.name}: usr="{username}" timmed out')
-                print(f' $Client({self.name}): 2FA failed. Access denied.')
+                console.log('RelyingParty').print(f'     $RP({RP.name}): usr="{username}" timmed out')
+                console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                 return False
             challenge: Challenge = RP.request_challenge(username, session_token, ykID) # will print generating challenge
             if challenge.RP_ID != RP.name:
-                print(f' $Client({self.name}): failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
-                space = ' ' * len(f' $Client({self.name}): ')
-                print(f'{space}... ignoring challenge')
-                print(f' ${RP.name}: usr="{username}" timmed out')
-                print(f' $Client({self.name}): 2FA failed. Access denied.')
+                console.log('Client').print(f'   $Client({self.name}): failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
+                space = ' ' * len(f'   $Client({self.name}): ')
+                console.log('Client').print(f'{space}... ignoring challenge')
+                console.log('RelyingParty').print(f'     $RP({RP.name}): usr="{username}" timmed out')
+                console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                 return False
-            print(f' $Client({self.name}): verified challenge sender as ({RP.name}). Challenge originating ID matches communicating sub-domain.')
-            space = ' ' * len(f' $Client({self.name}): ')
-            print(f'{space}... passing challenge to operating system for YubiKey authentication')
+            console.log('Client').print(f'   $Client({self.name}): verified challenge sender as ({RP.name}). Challenge originating ID matches communicating sub-domain.')
+            space = ' ' * len(f'   $Client({self.name}): ')
+            console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication')
             response: Optional[bytes] = connection.request_yubikey_auth_from_OS(ykID, challenge)
             if not response:
-                print(f'RESPONSE FAILED?????????')
+                console.log('Client').print(f'RESPONSE FAILED?????????')
             session_token = RP.grant_session_token_MFA(username, session_token, response)
             if not session_token:
-                print('SIGN IN FAILED!!!!!!!!')
-            print("SIGN IN SUCCESS!!!!!!!!")
-        print(f'$ {RP.name}: Successfully logged in as "{username}". Access granted')
+                console.log('Client').print('SIGN IN FAILED!!!!!!!!')
+            console.log('Client').print("SIGN IN SUCCESS!!!!!!!!")
+        console.log('RelyingParty').print(f'$ {RP.name}: Successfully logged in as "{username}". Access granted')
 
 
 def get_rand_id(length: int) -> str:
     return ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=length))
     
-def hash(input:str)->bytes:
+def hash(inp:str)->bytes:
     sha256_instance = sha256()
-    sha256_instance.update(input.encode('utf8'))
+    sha256_instance.update(inp.encode('utf8'))
     return sha256_instance.digest()
 
 def is_signed(nonce: bytes, public_key, response: bytes) -> bool:
@@ -391,13 +434,13 @@ class RunContext(Enum):
     AUTO_DETECT = 1
     INTERACTIVE = 2
 
-class Console:
-    def __init__(self, context: RunContext):
-        self.context: RunContext = context
-    
-    def log(self, *args, **kwargs):
-        if self.context == RunContext.AUTO_DETECT:
-            print(*args, **kwargs)
+# class Console:
+#     def __init__(self, context: RunContext):
+#        self.context: RunContext = context
+#     
+#     def log(self, *args, **kwargs):
+#         if self.context == RunContext.AUTO_DETECT:
+#            print(*args, **kwargs)
 
 __KNOWN_WEBSITES__: Dict[str, str] = {
     'Microsoft': 'login.microsoft.com',
@@ -412,9 +455,19 @@ __KNOWN_WEBSITES__: Dict[str, str] = {
 def bytes_to_base64(value: bytes) -> str:
     return base64.urlsafe_b64encode(value)
 
+class UserFacingConnection:
+    def __init__(self, connection: Connection):
+        self.connection: Connection = connection
+    def execute(self, action: ConnectionAction):
+        if action == ConnectionAction.Login:
+            pass
+        elif action == ConnectionAction.CreateNewAccount:
+            self.connection.website.create_new_account()
+
+
 class UserInterface:
     def __init__ (self, run_context: RunContext):
-        self.console: Console = Console(run_context)
+        self.console: Colors = Colors(display=(run_context == 1))
         # self.websites: dict[str, RelyingParty] = {}
         self.clients: Dict[str, Client] = {}
         self.YubiKeys = {}
@@ -423,20 +476,28 @@ class UserInterface:
         secret = os.urandom(32)
         YK = YubiKey(secret)
         self.YubiKeys[YK.ID] = YK
-        print(f" $YubiKey Factory: creating new YubiKey with ID = {YK.ID}")
-        print(f" $YubiKey Factory: hardcoded Yubikey({YK.ID}) with the following secret key: 64{bytes_to_base64(secret)}")
+        console.log('YubiKey Factory').print(f"     $YubiKey Factory: creating new YubiKey with ID = {YK.ID}")
+        console.log('YubiKey Factory').print(f"     $YubiKey Factory: hardcoded Yubikey({YK.ID}) with the following secret key: 64{bytes_to_base64(secret)}")
         return YK.ID
 
     def boot_client(self, client_name='Chome.exe') -> Client:
         if client_name not in self.clients.keys():
+            console.log('UserInterface').print(f' $UserInterface: creating new client "{client_name}"')
             self.clients[client_name] = Client(client_name)
+        else:
+            console.log('UserInterface').print(f' $UserInterface: client "{client_name}" already exists, restarting client...')
         return self.clients[client_name]
 
-    def get_connection(self, client_name, website):
+    def _get_connection(self, client_name, website):
         if client_name not in self.clients.keys():
+            console.log('UserInterface').print(f' $UserInterface: creating new client "{client_name}"')
             self.clients[client_name] = Client(client_name)
         client = self.clients[client_name]
-        return client.connect(website)
+        return client.connect(website, self)
+
+    def connect_to_internet(self, client_name, website):
+        console.log('UserInterface').print(f' $UserInterface: requesting client({client_name}) to connect to {website}')
+        return UserFacingConnection(self._get_connection(client_name, website))
 
     """
     def get_website(self, name) -> RelyingParty:
@@ -452,7 +513,8 @@ class UserInterface:
         website = RelyingParty(url)
         self.websites[name] = website
         return website
-"""
+    """
+    """
     def login(self, web_name) -> bool:
         RP = self.get_website(web_name)
         if RP.number_of_accounts == 0:
@@ -478,24 +540,27 @@ class UserInterface:
                 resp = input(f'UserInterface: Enter YubiKey ID or enter "-SHOW YUBIKEY IDs" to view all known YubiKey IDs > ')
                 
         print(f'$ {RP.name}: Successfully logged in as "{username}". Access granted')
-
+    """
     def insert_yubikey(self) -> Optional[int]:
         while True:
-            resp = input(f'UserInterface: Enter YubiKey ID or enter "-SHOW YUBIKEY IDs" to view all known YubiKey IDs > ')
+            resp = input(f'UserInterface: Enter YubiKey ID or enter "-SHOW YUBIKEY IDs" to view all known YubiKey IDs > {Colors.CLEAR}')
             if resp.lower() == '-show yubikey ids':
-                print('UserInterface: YubiKey IDs:')
+                console.log('UserInterface').print('UserInterface: YubiKey IDs:')
                 for id, YK in self.YubiKeys.items():
-                    print(f'  {id}: {YK}')
+                    console.log('UserInterface').print(f'  {id}: {YK}')
                 continue
             try:
                 id = int(resp)
                 if id in self.YubiKeys.keys():
-                    print(f'UserInterface: YubiKey({id}) inserted into computer...')
+                    console.log('UserInterface').print(f'UserInterface: YubiKey({id}) inserted into computer...')
                     return id
             except ValueError:
-                if input(f'UserInterface: No such key ("{id}"), try again (Y/n)? ').lower() in ['y', 'yes']:
+                console.log('UserInterface').post()
+                if input(f'UserInterface: No such key ("{id}"), try again (Y/n)? {Colors.CLEAR}').lower() in ['y', 'yes']:
+                    console.clear()
                     continue
-                print(f"UserInterface: You didn't enter a YubiKey in time!")
+                console.clear()
+                console.log('UserInterface').print(f"UserInterface: You didn't enter a YubiKey in time!")
                 return None
     # will always return bytes, may be wrong but will always return bytes (never None)
     def YubiKey_auth(self, ykID: int, challenge: Challenge) -> Optional[YubiKeyResponse]:

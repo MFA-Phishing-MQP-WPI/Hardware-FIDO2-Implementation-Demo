@@ -58,17 +58,22 @@ The `YubiKeyResponse` class encapsulates the response from the YubiKey after it 
 
 The demo shows the flow of a user logging into a website with 1FA (username and password) and then performing 2FA using a YubiKey. Here's a simplified step-by-step process:
 
-1. **Client Connection**: The `Client` connects to a `RelyingParty` (e.g., `login.microsoft.com`) and requests a login.
+1. **Client Connection**: The `Client` connects to a `RelyingParty` (e.g., `login.microsoft.com`)
+
+2. **Account Registration**: The `User` requests to add a `username + password` combo to the `RelyingParty`, which is passed through the `Client`.
+   1. Steps are followed to ensure security during the signup process.
+
+3. **MFA Registration**: The `User` requests to add a form of MFA to their account.
    
-2. **1FA Login**: The user inputs their username and password. If correct, a short-lived session token (1FA) is granted.
+4. **1FA Login**: The user inputs their username and password. If correct, a short-lived session token (1FA) is granted.
 
-3. **2FA Request**: If the user's account requires 2FA, the system requests the insertion of the user's YubiKey.
+5. **2FA Request**: If the user's account requires 2FA, the system requests the insertion of the user's YubiKey.
 
-4. **YubiKey Challenge**: The Relying Party generates a cryptographic challenge (a nonce) and sends it to the YubiKey for signing.
+6. **YubiKey Challenge**: The Relying Party generates a cryptographic challenge (a nonce) and sends it to the YubiKey for signing.
 
-5. **Challenge Signing**: The YubiKey signs the challenge with its private key, generating a `YubiKeyResponse` with the signed nonce.
+7. **Challenge Signing**: The YubiKey signs the challenge with its private key, generating a `YubiKeyResponse` with the signed nonce.
 
-6. **MFA Validation**: The Relying Party verifies the signature and, if correct, grants the user a long-term session token (MFA).
+8. **MFA Validation**: The Relying Party verifies the signature and, if correct, grants the user a long-term session token (MFA).
 
 <br>
 
@@ -81,6 +86,11 @@ To run the demo:
 2. Install dependencies:
    ```bash
    pip install cryptography
+   ```
+3. Run the demo: 
+   ```bash
+   python3 demo.py -default
+   ```
 
 <br>
 

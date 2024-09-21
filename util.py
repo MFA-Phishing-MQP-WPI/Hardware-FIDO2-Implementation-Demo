@@ -18,12 +18,17 @@ from display import Colors
 console: Colors = Colors(display=True)
 
 class ConnectionAction(Enum):
-    Login = 1
-    Logout = 2
-    Update_Password = 3
-    Update_MFA = 4
-    Close_Connection = 5
-    CreateNewAccount = 6
+    # can always do
+    Close_Connection = 0
+
+    # can only do when not logged in
+    Login = 11
+    CreateNewAccount = 12
+
+    # can only do when logged in
+    Update_Password = 21
+    Update_MFA = 22
+    Logout = 23
 
 class YubiKeyResponse:
     signature: bytes
@@ -111,23 +116,29 @@ class Account:
         self.public_key = None
 
 class SessionToken:
-    def __init__(self, account: str, hours: float, auth_type: str, data: bytes = os.urandom(16)):
-        self.for_account = account
-        self.auth_type = auth_type
+    def __init__(self, account: str, hours: float, auth_type: str, auth_type_required: str, data: bytes = os.urandom(16)):
+        self.for_account: str = account
+        self.auth_type: str = auth_type
+        self.account_requires: str = auth_type_required
         self.nonces = {}
+        self.active: bool = True
 
         # hidden
-        self._expires_on = datetime.datetime.now() + hours * 3600
+        self._expires_on = int(datetime.datetime.now(datetime.timezone.utc).timestamp()) + hours * 3600
         self._data = data
         self._value_string = f'Account={self.for_account},atype={self.auth_type},expires={self._expires_on},nonce={self._data.hex()}'
+    def set_inactive(self) -> None:
+        self.active = False
+    def is_logged_in(self) -> bool:
+        return not self.timmed_out() and self.active and self.auth_type == self.account_requires
     def value(self):
         return hash(self._value_string)
     def reinstate(self, new_hours: float) -> None:
-        self._expires_on = datetime.datetime.now() + new_hours * 3600
+        self._expires_on = int(datetime.datetime.now(datetime.timezone.utc).timestamp()) + new_hours * 3600
     def timmed_out(self) -> bool:
-        return datetime.datetime.now() > self._expires_on
+        return int(datetime.datetime.now(datetime.timezone.utc).timestamp()) > self._expires_on
     def is_valid(self, account: str, auth_type: str) -> bool:
-        if self.timmed_out():
+        if self.timmed_out() or not self.active:
             return False
         value_string = f'Account={account},atype={auth_type},expires={self._expires_on},nonce={self._data.hex()}'
         return hash(value_string) == self.value()  # validate
@@ -158,6 +169,10 @@ class RelyingParty:
 
     def number_of_accounts(self):
         return len(self.accounts)
+
+    def end_session(self, session: SessionToken) -> None:
+        self.tokens.pop(session.value(), None)
+        session.set_inactive()
 
     def create_new_account(self):
         console.log('RelyingParty').print(f'{self.INDENT}$RP({self.name}): WELCOME NEW USER TO {self.name.capitalize()}!')
@@ -220,18 +235,19 @@ class RelyingParty:
             public_key = '    Exists    ' if account.public_key else '     None     '
             print(f'| {username} | {password_hash} | {public_key} |')
         print('‾' * len(seper))
-    def _generate_token(self, account: str, hours: float, auth_type: str) -> bytes:
+    def _generate_token(self, account: str, hours: float, auth_type: str, required_auth_type: str) -> SessionToken:
         new_token = SessionToken(
             account,
             hours,
             auth_type,
+            required_auth_type,
             os.urandom(16)
         )
         self._add_token(
             account, 
             new_token
         )
-        return new_token.value()
+        return new_token
     def prune_tokens(self) -> None:
         for user, tokens in self.tokens.items():
             self.tokens[user] = [
@@ -257,12 +273,17 @@ class RelyingParty:
         if username not in self.accounts.keys():
             return False
         return self.accounts[username].password_hash == hash(password)
-    def grant_session_token_1FA(self, username: str, password: str) -> Optional[bytes]:
+    def grant_session_token_1FA(self, username: str, password: str) -> Optional[SessionToken]:
         if self.valid_login(username, password):
             # grant user token for 1FA
             # it will time out in 3 minutes (0.05 hours) unless user authenticates with 2FA
             # post-2FA: new token will be granted to user (1 hour exp) assuming this token is still valid
-            return self._generate_token(username, 0.05, '1FA')
+            return self._generate_token(
+                username, 
+                0.05, 
+                '1FA',
+                'MFA' if self.accounts[username].public_key else '1FA'
+                )
         return None # failed varification (username/password wrong)
     def grant_session_token_MFA(
             self, 
@@ -279,7 +300,7 @@ class RelyingParty:
             self.accounts[session.for_account].public_key,
             response.signature
         ):
-            return SessionToken(session.for_account, 1, 'MFA')
+            return SessionToken(session.for_account, 1, 'MFA', 'MFA')
         return None # failed MFA verification (YubiKey response not valid)
         
     def request_challenge(self, username: str, token: bytes, ykID: int) -> Challenge:
@@ -314,10 +335,18 @@ class Connection:
     def request_yubikey_auth_from_OS(self, ykID, challenge) -> bytes:
             return self.UI_ptr.YubiKey_auth(ykID, challenge)
     def login(self):
-        pass
+        token: SessionToken = self.client._login_user(self)
+        if token:
+            self.session_token = token
+            console.log('Client').print(f'   $Client({self.client.name}): successfully logged in as "{self.session_token.for_account}"')
+        else:
+            console.log('Client').print(f'   $Client({self.client.name}): failed to login')
     
-class Client:
+    def is_logged_in(self) -> bool:
+        return self.session_token and self.session_token.is_logged_in()
 
+
+class Client:
     def __init__(self, name='Chome.exe'):
         self.name = name
         self.websites: Dict[str, RelyingParty] = {}
@@ -334,27 +363,26 @@ class Client:
         if action == ConnectionAction.Login:
             self._login_user(connection)
 
-    def _login_user(self, connection: Connection):
-        web_name = connection.website
+    def _login_user(self, connection: Connection) -> Optional[SessionToken]:
+        web_name = connection.website.name
         RP = self.websites[web_name]
-        if RP.number_of_accounts == 0:
-            console.log('Client').print(f'   $Client({self.name}) ERR: No accounts found for "{web_name}". Create an account first.')
-            return False
+        if RP.number_of_accounts() == 0:
+            console.log('Client').print(f'   $Client({self.name})::ERR: No accounts found for "{web_name}". Create an account first.')
+            return None
         while True:
             console.log('Client').post()
             username = input(f'   $Client({self.name}): Enter username > {Colors.CLEAR}')
             console.log('Client').print(f'   $Client({self.name}): Enter password > {Colors.CLEAR}', end='')
-            password = getpass.getpass()
-            session_token: Optional[bytes] = RP.grant_session_token_1FA(username, password)
+            password = getpass.getpass(prompt='')
+            session_token: Optional[SessionToken] = RP.grant_session_token_1FA(username, password)
             if not session_token: 
                 console.log('RelyingParty').print(f'     $RP({RP.name}): Username or Password incorrect. Access denied. (1FA Fail)')
                 console.log('RelyingParty').post()
                 if input(f'   $Client({self.name}): Try again? (Y/n) > {Colors.CLEAR}').lower() in ['y', 'yes']:
-                    console.clear()
                     continue
-                console.clear()
-                return False
+                return None
             break
+        console.log('RelyingParty').print(f'{RP.INDENT}$RP({RP.name}): Username and password hash match...')
         if RP.requires_2FA(username):
             console.log('RelyingParty').print(f'     $RP({RP.name}): usr="{username}" requires 2FA...')
             console.log('RelyingParty').print(f'     $RP({RP.name}): insert and auth using YubiKey for the respective account.')
@@ -362,7 +390,7 @@ class Client:
             if not ykID:
                 console.log('RelyingParty').print(f'     $RP({RP.name}): usr="{username}" timmed out')
                 console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
-                return False
+                return None
             challenge: Challenge = RP.request_challenge(username, session_token, ykID) # will print generating challenge
             if challenge.RP_ID != RP.name:
                 console.log('Client').print(f'   $Client({self.name}): failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
@@ -370,18 +398,21 @@ class Client:
                 console.log('Client').print(f'{space}... ignoring challenge')
                 console.log('RelyingParty').print(f'     $RP({RP.name}): usr="{username}" timmed out')
                 console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
-                return False
+                return None
             console.log('Client').print(f'   $Client({self.name}): verified challenge sender as ({RP.name}). Challenge originating ID matches communicating sub-domain.')
             space = ' ' * len(f'   $Client({self.name}): ')
             console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication')
             response: Optional[bytes] = connection.request_yubikey_auth_from_OS(ykID, challenge)
             if not response:
                 console.log('Client').print(f'RESPONSE FAILED?????????')
-            session_token = RP.grant_session_token_MFA(username, session_token, response)
+            session_token: SessionToken = RP.grant_session_token_MFA(username, session_token, response)
             if not session_token:
-                console.log('Client').print('SIGN IN FAILED!!!!!!!!')
-            console.log('Client').print("SIGN IN SUCCESS!!!!!!!!")
-        console.log('RelyingParty').print(f'$ {RP.name}: Successfully logged in as "{username}". Access granted')
+                console.log('Client').print(f'  $Client({self.name}): SIGN IN FAILED!!!!!!!!')
+            console.log('Client').print("  $Client({self.name}): SIGN IN SUCCESS!!!!!!!!")
+        else:
+            console.log('RelyingParty').print(f'{RP.INDENT}$RP({RP.name}): User={username} does not have 2FA configured -> skipping 2FA')
+        console.log('RelyingParty').print(f'{RP.INDENT}$RP({RP.name}): User={username} Access Granted!')
+        return session_token
 
 
 def get_rand_id(length: int) -> str:
@@ -460,10 +491,25 @@ class UserFacingConnection:
         self.connection: Connection = connection
     def execute(self, action: ConnectionAction):
         if action == ConnectionAction.Login:
-            pass
+            self.connection.login()
         elif action == ConnectionAction.CreateNewAccount:
             self.connection.website.create_new_account()
-
+        elif action == ConnectionAction.Logout:
+            self.connection.website.end_session(self.connection.session_token)
+    def available_actions(self) -> List[ConnectionAction]:
+        return [
+            ConnectionAction.Login,
+            ConnectionAction.CreateNewAccount,
+            ConnectionAction.Close_Connection
+        ] if not self.is_logged_in() else [
+            ConnectionAction.Update_Password, 
+            ConnectionAction.Update_MFA, 
+            ConnectionAction.Logout,
+            ConnectionAction.Close_Connection
+        ]
+        
+    def is_logged_in(self) -> bool:
+        return self.connection.is_logged_in()
 
 class UserInterface:
     def __init__ (self, run_context: RunContext):

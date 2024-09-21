@@ -103,6 +103,49 @@ To run the demo:
 
 <br>
 
+<be>
+
+## Already Implemented
+
+### Main Menu Actions
+##### ✔️ `Add Browser`
+##### ✔️ `Add YubiKey`
+##### ✔️ `Connect to website`
+
+### Website Logged-Out Actions
+##### ✔️ `Close Connection` / `Go back to the main menu`
+##### ✔️ `Add a new account`
+##### ✔️ `Login (1FA)`
+##### ❌ `Login (MFA)`
+
+### Website Logged-In Actions
+##### ✔️ `Close Connection` / `Go back to the main menu`
+##### ❌ `Add MFA`
+##### ❌ `Change Password`
+##### ❌ `Update MFA`
+##### ❌ Brainstorm other `secure account actions` like `Send an email`, `view inbox`, and other secure actions
+
+### Backend Actions
+##### ✔️ `Create New Browser`
+##### ✔️ `Create new YubiKey`
+##### ✔️ `Create new RelyingParty`
+##### ✔️ `Administer new SessionToken`
+##### ✔️ `Varify SessionToken Validity`
+* ###### ✔️ `SessionToken For Correct Account`
+* ###### ✔️ `SessionToken Not Expired or Timmed Out`
+* ###### ✔️ `SessionToken Still Active` `(Not Revoked)`
+* ###### ✔️ `SessionToken For Correct Website`
+##### ✔️ `Create new UserFacingConnection`
+##### ✔️ `Complete UserFacingConnection Actions`
+##### ✔️ `Interface with all classes from demo class` classes: [`Browser`, `YubiKey`, `RelyingParty`, `UserInterface`, `Connection`, `UserFacingConnection`, `AccountActions`]
+
+
+
+
+
+
+<br>
+
 <br>
 
 <br>

@@ -1,5 +1,5 @@
 # from util import YubiKey, is_signed, RelyingParty
-from util import UserInterface, RunContext, UserFacingConnection, ConnectionAction, Client
+from util import UserInterface, RunContext, UserFacingConnection, ConnectionAction
 from typing import Dict, List
 import time
 import os
@@ -86,25 +86,25 @@ class Demo:
         ykID: str = self.ui.new_YubiKey()
         self.ykIDs.append(ykID)
         print(f'You now have {len(self.ykIDs)} yubikeys paired to this device.')
-        print('  RETURNING TO MAIN MENU...\n')
+        print('>> RETURNING TO MAIN MENU...\n')
         time.sleep(1)
     
     def show_yubikeys(self):
         if len(self.ykIDs) == 0:
             print("You don't have any yubikeys paired to this device")
-            print('  RETURNING TO MAIN MENU...\n')
+            print('>> RETURNING TO MAIN MENU...\n')
             time.sleep(1)
             return
         print('Your YubiKey IDs:')
         for i, ykID in enumerate(self.ykIDs):
             print(f'\t{i+1}: {ykID}')
-        print('  RETURNING TO MAIN MENU...\n')
+        print('>> RETURNING TO MAIN MENU...\n')
         time.sleep(1)
 
     def connect_to_website(self):
         if len(self.browsers) == 0:
             print("You don't have any browsers installed, you need a browser to connect to a website")
-            print('  RETURNING TO MAIN MENU...\n')
+            print('>> RETURNING TO MAIN MENU...\n')
             time.sleep(1)
             return
         browser = self._choose(
@@ -113,32 +113,43 @@ class Demo:
             '  Enter the number of your choice > '
         )
         self.ui.boot_client(client_name=browser)
-        website_name = self._webselect()
+        website_name: str = self._webselect()
         if not website_name or website_name == 'new website':
             website_name = input("Where would you like to connect to: ")
         Portal: UserFacingConnection = self.ui.connect_to_internet(browser, website_name)
         if website_name not in self.visited_websites: self.visited_websites.append(website_name)
         print('Established connection successfully!')
+        ALL_CONECTIONACTIONS: List[ConnectionAction] = [
+            # ConnectionAction.Close_Connection, # this is already taken care of
+            ConnectionAction.CreateNewAccount,
+            ConnectionAction.Login,
+            ConnectionAction.Logout,
+            ConnectionAction.Update_MFA,
+            ConnectionAction.Update_Password
+        ]
         while True:
-            action = self._choose(
-                f'What would you like to do on {website_name}?',
-                ['create new account', 'login', 'close connection'],
-                '  Enter the number of your choice > '
-            )
-            if action == 'create new account':
-                Portal.execute(ConnectionAction.CreateNewAccount)
-                print('\n <<< ACTION COMPLETED >>>\n')
-                continue
-            elif action == 'login':
-                Portal.execute(ConnectionAction.Login)
-                print('\n <<< ACTION COMPLETED >>>\n')
-                continue
-            break
+            action: str = self.get_action_from_portal(Portal)
+            if action == ConnectionAction.Close_Connection.name:
+                break
+            for possible_action in ALL_CONECTIONACTIONS:
+                if action == possible_action.name:
+                    Portal.execute(possible_action)
+                    print('\n <<< ACTION COMPLETED >>>\n')
+                    break
         print(f'Closing connection to {website_name}...')
-        print('  RETURNING TO MAIN MENU...\n')
+        print('>> RETURNING TO MAIN MENU...\n')
         time.sleep(1)
         
-
+    def get_action_from_portal(self, portal: UserFacingConnection) -> str:
+        actions = [action.name for action in portal.available_actions()]
+        action_header = f'Welcome to {portal.connection.website.name}! What action would you like to?'
+        if portal.is_logged_in():
+            action_header = f'Hello {portal.connection.session_token.for_account}! What action would you like to:'
+        return self._choose(
+            action_header,
+            actions,
+            '  Enter the number of your choice > '
+        )
 
 
 def main():

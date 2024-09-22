@@ -103,11 +103,9 @@ To run the demo:
 
 <br>
 
-<be>
+<br>
 
 ## Already Implemented
-
-<br> 
 
 ### Main Menu Actions
 ##### ✔️ `Add Browser`

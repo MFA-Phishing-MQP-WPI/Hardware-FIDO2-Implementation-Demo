@@ -111,24 +111,33 @@ To run the demo:
 
 ### Main Menu Actions
 ##### ✔️ `Add Browser`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ✔️ `Add YubiKey`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ✔️ `Connect to website`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 
 <br>
 
 ### Website Logged-Out Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
 ##### ✔️ `Add a new account`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ✔️ `Login (1FA)`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ `Login (MFA)`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 
 <br>
 
 ### Website Logged-In Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
 ##### ❌ `Add MFA`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ `Change Password`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ `Update MFA`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ Brainstorm other `secure account actions` like `Send an email`, `view inbox`, and other secure actions
 
 <br>

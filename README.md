@@ -107,16 +107,22 @@ To run the demo:
 
 ## Already Implemented
 
+<br> 
+
 ### Main Menu Actions
 ##### ✔️ `Add Browser`
 ##### ✔️ `Add YubiKey`
 ##### ✔️ `Connect to website`
+
+<br>
 
 ### Website Logged-Out Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
 ##### ✔️ `Add a new account`
 ##### ✔️ `Login (1FA)`
 ##### ❌ `Login (MFA)`
+
+<br>
 
 ### Website Logged-In Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
@@ -125,19 +131,25 @@ To run the demo:
 ##### ❌ `Update MFA`
 ##### ❌ Brainstorm other `secure account actions` like `Send an email`, `view inbox`, and other secure actions
 
+<br>
+
 ### Backend Actions
 ##### ✔️ `Create New Browser`
 ##### ✔️ `Create new YubiKey`
 ##### ✔️ `Create new RelyingParty`
 ##### ✔️ `Administer new SessionToken`
 ##### ✔️ `Varify SessionToken Validity`
-* ###### ✔️ `SessionToken For Correct Account`
-* ###### ✔️ `SessionToken Not Expired or Timmed Out`
-* ###### ✔️ `SessionToken Still Active` `(Not Revoked)`
-* ###### ✔️ `SessionToken For Correct Website`
+##### ✔️ `Save State in .dump file`
+##### ✔️ `Recover From .dump file`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Account`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Not Expired or Timmed Out`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Still Active` `(Not Revoked)`
+###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Website`
 ##### ✔️ `Create new UserFacingConnection`
 ##### ✔️ `Complete UserFacingConnection Actions`
 ##### ✔️ `Interface with all classes from demo class` classes: [`Browser`, `YubiKey`, `RelyingParty`, `UserInterface`, `Connection`, `UserFacingConnection`, `AccountActions`]
+##### ❌ `Display Backend Cryptography`
+##### ❌ `Togle Backend Cryptography Display`
 
 
 

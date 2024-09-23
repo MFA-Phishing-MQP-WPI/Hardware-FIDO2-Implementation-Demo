@@ -452,17 +452,30 @@ class RelyingParty:
         session.set_inactive()
         return True
 
-    def create_new_account(self) -> bool:
+    def create_new_account(self, connection: 'Connection') -> bool:
         try:
-            self.p(f'WELCOME NEW USER TO {self.name.capitalize()}!')
-            self.p(f'Let\'s create a new account!')
+            client_name = connection.client.name
+            console.log('Client').print(f'   $Client({client_name}): Requesting new account from RP({self.name})')
             time.sleep(0.1)
-            console.log(self.classname).post()
-            username = input(f'{self.INDENT}$RP({self.name}): Enter your username > {Colors.CLEAR}')
-            self.p(f'Enter your password {Colors.CLEAR}', end='')
+            self.p(f'Recieved new account request from Client({client_name})')
+            self.p(f'Forwarding new account message and form to Client({client_name})')
+            time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client_name}): Recieved new account message and form from RP({self.name})')
+            console.log('Client').print(f'   $Client({client_name}): Printing new account message and requesting new account form from user...')
+            time.sleep(0.2)
+            print('')
+            time.sleep(0.25)
+            console.log('Client').print(f'   $Client({client_name}): WELCOME NEW USER TO {self.name.capitalize()}!')
+            console.log('Client').print(f'   $Client({client_name}): Let\'s create a new account!')
+            time.sleep(0.1)
+            console.log('Client').post()
+            username = input(f'   $Client({client_name}): Enter your username > {Colors.CLEAR}')
+            console.log('Client').print(f'   $Client({client_name}): Enter your password {Colors.CLEAR}', end='')
             password = getpass.getpass(prompt='')
-            self.p(f'Confirm your password {Colors.CLEAR}', end='')
-            if password != getpass.getpass(prompt=''):
+            console.log('Client').print(f'   $Client({client_name}): Confirm your password {Colors.CLEAR}', end='')
+            confirm_password = getpass.getpass(prompt='')
+            console.log('Client').print(f'   $Client({client_name}): Passing filled out form to RP({self.name})')
+            if password != confirm_password:
                 console.clear()
                 console.log(self.classname).err(f'{self.INDENT}$RP({self.name})::ERR - Passwords do not match.')
                 return False
@@ -868,7 +881,7 @@ class UserFacingConnection:
         if action == ConnectionAction.Login:
             return self.connection.login()
         if action == ConnectionAction.CreateNewAccount:
-            return self.connection.website.create_new_account()
+            return self.connection.website.create_new_account(self.connection)
         if action == ConnectionAction.Logout:
             return self.connection.website.end_session(self.connection.session_token)
         if action == ConnectionAction.Update_Password:

@@ -6,6 +6,7 @@ import time
 import os
 import sys
 from arg import Parser
+from display import COLOR_CODES
 
 class Demo:
     def __init__(self, context: RunContext):
@@ -82,7 +83,7 @@ class Demo:
         print('Exiting...')
 
     def possible_save_state(self):
-        print('>> THIS STATE HAS UNSAVED CHANGES!')
+        print(f'>> {COLOR_CODES.WARN}WARNING: This state has unsaved changes!{COLOR_CODES.RESET}')
         if input('Do you want to save the current state to a file? (Y/n) > ').lower() in ['y', 'yes']:
             self.save_state()
 

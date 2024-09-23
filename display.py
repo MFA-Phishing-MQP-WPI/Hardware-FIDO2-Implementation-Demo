@@ -61,6 +61,20 @@ class Colors:
         global backend_display
         backend_display = print if display else VOID.print
 
+
+
+class COLOR_CODES:
+    RESET: str = Colors.CLEAR
+    OK: str = Colors.GREEN
+    CLIENT_LOG: str = Colors.BLUE
+    ERROR: str = Colors.RED
+    ERROR_HEADER: str = Colors.RED_REVERSE
+    WARN: str = Colors.YELLOW_REVERSE
+
+    @staticmethod
+    def err(header: str, message: str):
+        print(f'\n\t{COLOR_CODES.ERROR_HEADER}{header.replace(" ", "-").upper()}{COLOR_CODES.RESET}{COLOR_CODES.ERROR}{message}{COLOR_CODES.RESET}\n')
+
 class RED:
     @staticmethod
     def post():

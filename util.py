@@ -9,7 +9,6 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.exceptions import InvalidSignature
-import base64
 import time
 import datetime
 import string
@@ -19,8 +18,9 @@ from typing import Optional, List, Dict
 from display import Colors
 
 state_saved: bool = False
+display_backend: bool = True
 
-console: Colors = Colors(display=True)
+console: Colors = Colors(display=True, backend=True)
 WEBSITES: Dict[str, 'RelyingParty'] = {}
 
 class ConnectionAction(Enum):
@@ -39,24 +39,23 @@ class ConnectionAction(Enum):
     Logout = 23
 
 Tracker: List['RelyingParty'] = []
-
 class Hasher:
-    def __init__(self, password: str, salt: Optional[bytes] = None):
+    def __init__(self, password: str, salt: Optional[bytes] = None, display: bool = True):
         if salt is None:
             salt = os.urandom(32)
-            print(f"Generating random salt: {salt.hex()}")
-        print(f"Initializing Hasher object from password=\"{password}\" and salt={salt.hex()}...")
+            Hasher.print_backend(display, f'No salt provided ... Generating random salt: {salt.hex()}')
+        Hasher.print_backend(display, f'Initializing Hasher object from password="{password}" and salt={salt.hex()}...')
         self.salt = salt
         self.hashed_password = self._hash_password(password, salt)
 
-    def _hash_password(self, password: str, salt: bytes) -> str:
-        print("Using Argon2 to hash password...")
+    def _hash_password(self, password: str, salt: bytes, display=display_backend) -> str:
+        Hasher.print_backend(display, f'Using Argon2 to hash password...')
         ph = PasswordHasher()
         return ph.hash(password.encode(), salt=salt)
 
-    def hash_str(self) -> str:
-        print("Returning hash string...")
-        print(f'{self.hashed_password=}\n\n')
+    def hash_str(self, display=display_backend) -> str:
+        Hasher.print_backend(display, f'Generating hash string... (i.e. "[hashed_password]:[salt]")')
+        Hasher.print_backend(display, f'Resulting hash: "{self.hashed_password}"')
         return f"{self.hashed_password}:{self.salt.hex()}"
     
     def __str__(self) -> str:
@@ -79,30 +78,19 @@ class Hasher:
         return provided_hasher == stored_hasher
 
     @staticmethod
-    def from_hash_string(hash_string: str) -> 'Hasher':
-        print(f"Creating Hasher object from hash string: {hash_string}")
+    def from_hash_string(hash_string: str, display=display_backend) -> 'Hasher':
+        Hasher.print_backend(display, f'Creating Hasher object from hash string: {hash_string}')
         hashed_password, salt = hash_string.split(':')
         salt = bytes.fromhex(salt)
-        print(f"Extracted salt: {salt.hex()}")
+        Hasher.print_backend(display, f'Extracted salt: {salt.hex()}')
         hasher = Hasher("", salt=salt)  
         hasher.hashed_password = hashed_password  
         return hasher
-
-class Server:
-    def __init__(self):
-        self.accounts: Dict[str, Account] = {}
-    
-    def add_account(self, account: 'Account'):
-        self.accounts[account.name] = account
-    def get_account(self, account_name: str) -> Optional['Account']:
-        if account_name in self.accounts.keys():
-            return self.accounts[account_name]
-        return None
-    def set_accounts(self, accounts: Dict[str, 'Account']):
-        self.accounts = accounts
-    def bulk_add_account(self, accounts: List['Account']):
-        for account in accounts:
-            self.add_account(account)
+    @staticmethod
+    def print_backend(display: bool, message: str) -> None:
+        if display:
+            print('       ', end='')
+            console.log('RelyingParty').print_backend('$RP(g).crypto_backend:', f" {message}")
 
 class YubiKeyResponse:
     signature: bytes
@@ -210,15 +198,23 @@ class YubiKey:
         return secret
     
 class Account:
-    def __init__(self, name: str, password_hash: bytes, pk=None, pk_id: Optional[str] = None):
+    def __init__(self, name: str, hash: Hasher, pk=None, pk_id: Optional[str] = None):
         self.name: str = name
-        self.password_hash: bytes = password_hash
+        self._hasher_object: Hasher = hash
+        self.password_hash: str = ''
+        self.salt: str          = ''
+        self.password_hash, self.salt = self._hasher_object.hash_str().split(':')
         self.public_key = pk
         self.public_key_to_display = pk_id
 
+    def has_same_password(self, password: str) -> bool:
+        return Hasher.is_correct_password(
+            password, 
+            self._hasher_object.hash_str()
+        )
 
     def __str__(self) -> str:
-        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}<br-splitter>public_key={self.public_key}<br-splitter>public_key_to_display={self.public_key_to_display}</Account>'
+        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key={self.public_key}<br-splitter>public_key_to_display={self.public_key_to_display}</Account>'
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -226,7 +222,7 @@ class Account:
     @staticmethod
     def from_string(account_string: str) -> 'Account':
         username_pattern = r"Username=(.*?)<br-splitter>"
-        password_pattern = r"Password=b['\"](.*?)['\"]<br-splitter>"
+        password_pattern = r"Password=(.*?)<br-splitter>"
         public_key_pattern = r"public_key=(.*?)<br-splitter>"
         public_key_to_display_pattern = r"<br-splitter>public_key_to_display=(.*?)</Account>"
 
@@ -238,7 +234,7 @@ class Account:
 
         # Get the matches, convert password hash to bytes, handle public key 'None'
         username = username_match.group(1) if username_match else None
-        password_hash = eval(f"b'{password_match.group(1)}'") if password_match else None
+        password_hash_str = password_match.group(1) if password_match else None
         public_key = public_key_match.group(1) if public_key_match else None
         public_key_to_display = public_key_to_display_match.group(1) if public_key_to_display_match else None
 
@@ -248,7 +244,12 @@ class Account:
             public_key = None
         if public_key_to_display == 'None':
             public_key_to_display = None
-        account: Account = Account(username, password_hash, pk=public_key, pk_id=public_key_to_display)
+        if not password_hash_str:
+            print('\n\nerr: dumping...')
+            print(f'{account_string=}')
+            print(f'{password_hash_str=}')
+            raise ValueError('Invalid password hash group specified')
+        account: Account = Account(username, Hasher.from_hash_string(password_hash_str), pk=public_key, pk_id=public_key_to_display)
         return account
     @staticmethod
     def split(s: str) -> List['Account']:
@@ -336,6 +337,9 @@ class RelyingParty:
         if 'end' in kwargs.keys():
             end = kwargs['end']
         console.log(self.classname).print(f'{self.INDENT}$RP({self.name}): {a}', end=end)
+
+    def crypto(self, s: str):
+        console.log(self.classname).print_backend(f'{self.INDENT}$RP({self.name}): {s}')
 
     def number_of_accounts(self):
         return len(self.accounts)
@@ -452,7 +456,7 @@ class RelyingParty:
         try:
             self.p(f'WELCOME NEW USER TO {self.name.capitalize()}!')
             self.p(f'Let\'s create a new account!')
-            time.sleep(1)
+            time.sleep(0.1)
             console.log(self.classname).post()
             username = input(f'{self.INDENT}$RP({self.name}): Enter your username > {Colors.CLEAR}')
             self.p(f'Enter your password {Colors.CLEAR}', end='')
@@ -489,9 +493,10 @@ class RelyingParty:
             if account_name in self.accounts.keys():
                 raise ValueError(f"Account '{account_name}' already exists.")
             self.tokens[account_name] = []
+            # pHash, salt = Hasher(account_password).hash_str().split(':')
             self.accounts[account_name] = Account(
                 account_name,
-                hash(account_password)
+                Hasher(account_password)
             )
             self._longest_account_length = max(self._longest_account_length, len(account_name))
             return True
@@ -510,15 +515,15 @@ class RelyingParty:
     def display_table(self) -> bool:
         print(f"\nRelying Party '{self.name}' accounts table:")
         dotted_line = '-' * (self._longest_account_length + 2)
-        seper = f'|{dotted_line}|---------------------------------|----------------|'
+        seper = f'|{dotted_line}|---------------------------------------|-----------------------------|----------------|'
         print('_' * len(seper))
-        print('| ' + 'Username'.center(self._longest_account_length) + ' |          Password Hash          | MFA Public Key |')
+        print('| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA Public Key |')
         print(seper)
         for account_name, account in self.accounts.items():
             username = account_name.center(self._longest_account_length)
-            password_hash = f'0x{account.password_hash.hex()}'[:28] + '...'
             public_key = '    Exists    ' if account.public_key else '     None     '
-            print(f'| {username} | {password_hash} | {public_key} |')
+            hash, salt = account._hasher_object.hash_str(display=False).split(':')
+            print(f'| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {public_key} |')
         print('‾' * len(seper))
         return True
     def _generate_token(self, account: str, hours: float, auth_type: str, required_auth_type: str, by_connection: 'Connection') -> SessionToken:
@@ -558,9 +563,20 @@ class RelyingParty:
         return None
     def valid_login(self, username: str, password: str) -> bool:
         if username not in self.accounts.keys():
+            console.log(self.classname).print(f' --d $RP({self.name}): Username could not be found! Sending code "HTTP 403" back to Client')
             return False
-        return self.accounts[username].password_hash == hash(password)
+        console.log(self.classname).print(f'     $RP({self.name}): Hashing password with stored salt to compare against stored hashed password...')
+        time.sleep(0.1)
+        response: bool = self.accounts[username].has_same_password(password)
+        if response:
+            console.log(self.classname).print(f' --d $RP({self.name}): Password Hash matches! Sending code "HTTP 200" back to Client')
+        else:
+            console.log(self.classname).print(f' --d $RP({self.name}): Password Hash does not match! Sending code "HTTP 403" back to Client')
+        time.sleep(0.1)
+        return response
     def grant_session_token_1FA(self, username: str, password: str, by_connection: 'Connection') -> Optional[SessionToken]:
+        console.log(self.classname).print(f'     $RP({self.name}): Recieved Tuple(Username, Password) from Client({self.name})')
+        time.sleep(0.1)
         if self.valid_login(username, password):
             # grant user token for 1FA
             # it will time out in 3 minutes (0.05 hours) unless user authenticates with 2FA
@@ -720,14 +736,19 @@ class Client:
                 console.log('Client').err(f'   $Client({self.name})::ERR: No accounts found for "{web_name}". Create an account first.')
                 return None
             while True:
+                console.log('Client').print(f'   $Client({self.name}): Sending login request to RP({RP.name})')
+                console.log(RP.classname).print(f'     $RP({RP.name}): Requesting Tuple(Username, Password) from Client({self.name})')
                 console.log('Client').post()
                 username = input(f'   $Client({self.name}): Enter username > {Colors.CLEAR}')
                 console.log('Client').print(f'   $Client({self.name}): Enter password > {Colors.CLEAR}', end='')
                 password = getpass.getpass(prompt='')
+                secure_password = '*' * len(password)
+                console.log('Client').print(f'   $Client({self.name}): Passing Tuple({username, secure_password}) to RP({RP.name})')
                 session_token: Optional[SessionToken] = RP.grant_session_token_1FA(username, password, connection)
                 if not session_token: 
                     console.log(RP.classname).print(f'     $RP({RP.name}): Username or Password incorrect. Access denied. (1FA Fail)')
-                    console.log(RP.classname).post()
+                    console.log('Client').print(f'   $Client({self.name}): Recieved "HTTP 403" (Access denied) from RP({RP.name})')
+                    console.log('Client').post()
                     if input(f'   $Client({self.name}): Try again? (Y/n) > {Colors.CLEAR}').lower() in ['y', 'yes']:
                         continue
                     return None

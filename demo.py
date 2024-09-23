@@ -1,4 +1,5 @@
 # from util import YubiKey, is_signed, RelyingParty
+import packagemanager
 from util import UserInterface, RunContext, UserFacingConnection, ConnectionAction, state_saved
 from typing import Dict, List, Optional
 import time
@@ -81,8 +82,8 @@ class Demo:
         print('Exiting...')
 
     def possible_save_state(self):
-        print('Unsaved changes to state ...')
-        if input('Do you want to save the current state to a file? (Y/n) ').lower() in ['y', 'yes']:
+        print('>> THIS STATE HAS UNSAVED CHANGES!')
+        if input('Do you want to save the current state to a file? (Y/n) > ').lower() in ['y', 'yes']:
             self.save_state()
 
     def save_state(self):
@@ -299,7 +300,7 @@ def generate_session_from_file(filename: Optional[str]) -> Optional[Demo]:
     
 
 if __name__ == "__main__":
-    args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 3])
+    args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 2, 3, 4])
     filename: Optional[str] = args['--launch-from-save']
     main(generate_session_from_file(filename), RunContext.AUTO_DETECT, args['-display_crypto_backend'])
     

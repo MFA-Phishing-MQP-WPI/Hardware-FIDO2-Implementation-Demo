@@ -7,13 +7,13 @@ class VOID:
     def print(*args, **kwargs):
         pass
     @staticmethod
-    def print_backend(*args, **kwargs):
+    def print_backend(header: str, s: str):
         pass
     @staticmethod
     def err(*args, **kwargs):
         pass
 
-backend_display = VOID.print
+backend_display = print
 
 class Colors:
     CLEAR = "\033[0m"
@@ -36,15 +36,18 @@ class Colors:
     YELLOW_REVERSE = "\033[43;97m"
     BLUE_REVERSE = "\033[44;97m"
 
-    def __init__(self, display=False):
+    def __init__(self, display=False, backend=True):
         self.display = display
         self.userlogs = {
-            'UserInterface': BLUE,
-            'Client': RED,
+            'UserInterface': RED,
+            'Client': BLUE,
             'RelyingParty': GREEN,
             'YubiKey': YELLOW,
             'YubiKey Factory' : DARK_YELLOW_BOLD
         }
+        if not backend:
+            global backend_display
+            backend_display = VOID.print
     def log(self, user):
         if not self.display:
             return VOID
@@ -68,11 +71,9 @@ class RED:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(*args, **kwargs):
+    def print_backend(header: str, s: str):
         global backend_display
-        backend_display(Colors.RED_GREY_HIGHLIGHT, end='\r')
-        backend_display(*args, **kwargs)
-        backend_display(Colors.CLEAR, end='\r')
+        backend_display(f'{Colors.RED_GREY_HIGHLIGHT}{header}{Colors.RED}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.RED_REVERSE}{s}{Colors.CLEAR}')
@@ -86,10 +87,9 @@ class GREEN:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(*args, **kwargs):
+    def print_backend(header: str, s: str):
         global backend_display
-        backend_display(Colors.GREEN_GREY_HIGHLIGHT, end='\r')
-        backend_display(*args, Colors.CLEAR, **kwargs)
+        backend_display(f'{Colors.GREEN_GREY_HIGHLIGHT}{header}{Colors.CLEAR}{Colors.GREEN}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.GREEN_REVERSE}{s}{Colors.CLEAR}')
@@ -103,11 +103,9 @@ class YELLOW:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(*args, **kwargs):
+    def print_backend(header: str, s: str):
         global backend_display
-        backend_display(Colors.YELLOW_GREY_HIGHLIGHT, end='\r')
-        backend_display(*args, **kwargs)
-        backend_display(Colors.CLEAR, end='\r')
+        backend_display(f'{Colors.YELLOW_GREY_HIGHLIGHT}{header}{Colors.YELLOW}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.YELLOW_REVERSE}{s}{Colors.CLEAR}')
@@ -120,7 +118,7 @@ class DARK_YELLOW_BOLD:
         print(Colors.DARK_YELLOW_BOLD, end='\r')
         print(*args, Colors.CLEAR, **kwargs)
     @staticmethod
-    def print_backend(*args, **kwargs):
+    def print_backend(header: str, s: str):
         pass
 class BOLD:
     @staticmethod
@@ -132,11 +130,9 @@ class BOLD:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(*args, **kwargs):
+    def print_backend(header: str, s: str):
         global backend_display
-        backend_display(Colors.BOLD, end='\r')
-        backend_display(*args, **kwargs)
-        backend_display(Colors.CLEAR, end='\r')
+        backend_display(f'{Colors.BOLD}{header}{s}{Colors.CLEAR}')
 class BLUE:
     @staticmethod
     def post():
@@ -147,10 +143,9 @@ class BLUE:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(*args, **kwargs):
+    def print_backend(header: str, s: str):
         global backend_display
-        backend_display(Colors.BLUE_GREY_HIGHLIGHT, end='\r')
-        backend_display(*args, Colors.CLEAR, **kwargs)
+        backend_display(f'{Colors.BLUE_GREY_HIGHLIGHT}{header}{Colors.BLUE}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.BLUE_REVERSE}{s}{Colors.CLEAR}')

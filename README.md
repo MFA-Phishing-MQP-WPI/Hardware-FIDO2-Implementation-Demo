@@ -103,42 +103,27 @@ To run the demo:
 
 <br>
 
-<br>
+<be>
 
 ## Already Implemented
 
 ### Main Menu Actions
 ##### ✔️ `Add Browser`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ✔️ `Add YubiKey`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ✔️ `Connect to website`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
-
-<br>
 
 ### Website Logged-Out Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
 ##### ✔️ `Add a new account`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ✔️ `Login (1FA)`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ `Login (MFA)`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
-
-<br>
 
 ### Website Logged-In Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
 ##### ❌ `Add MFA`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ `Change Password`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ `Update MFA`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ❌ `Supports python.exceptions.KeyboardInterrupt to stop during this step`
 ##### ❌ Brainstorm other `secure account actions` like `Send an email`, `view inbox`, and other secure actions
-
-<br>
 
 ### Backend Actions
 ##### ✔️ `Create New Browser`
@@ -146,17 +131,13 @@ To run the demo:
 ##### ✔️ `Create new RelyingParty`
 ##### ✔️ `Administer new SessionToken`
 ##### ✔️ `Varify SessionToken Validity`
-##### ✔️ `Save State in .dump file`
-##### ✔️ `Recover From .dump file`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Account`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Not Expired or Timmed Out`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Still Active` `(Not Revoked)`
-###### &nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Website`
+* ###### ✔️ `SessionToken For Correct Account`
+* ###### ✔️ `SessionToken Not Expired or Timmed Out`
+* ###### ✔️ `SessionToken Still Active` `(Not Revoked)`
+* ###### ✔️ `SessionToken For Correct Website`
 ##### ✔️ `Create new UserFacingConnection`
 ##### ✔️ `Complete UserFacingConnection Actions`
 ##### ✔️ `Interface with all classes from demo class` classes: [`Browser`, `YubiKey`, `RelyingParty`, `UserInterface`, `Connection`, `UserFacingConnection`, `AccountActions`]
-##### ❌ `Display Backend Cryptography`
-##### ❌ `Togle Backend Cryptography Display`
 
 
 

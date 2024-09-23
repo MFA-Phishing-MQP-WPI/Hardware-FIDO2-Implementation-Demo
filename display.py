@@ -1,3 +1,20 @@
+
+class VOID:
+    @staticmethod
+    def post():
+        pass
+    @staticmethod
+    def print(*args, **kwargs):
+        pass
+    @staticmethod
+    def print_backend(*args, **kwargs):
+        pass
+    @staticmethod
+    def err(*args, **kwargs):
+        pass
+
+backend_display = VOID.print
+
 class Colors:
     CLEAR = "\033[0m"
     GREEN = "\033[92m"
@@ -5,8 +22,19 @@ class Colors:
     YELLOW = "\033[93m"
     BLUE = "\033[94m"
     BOLD = "\033[1m"
-    # DARK_YELLOW_BOLD = "\e[0;33m"
     DARK_YELLOW_BOLD = '\033[33m33'
+    
+    # Grey highlight versions
+    GREEN_GREY_HIGHLIGHT = "\033[100;92m"
+    RED_GREY_HIGHLIGHT = "\033[100;1;31m"
+    YELLOW_GREY_HIGHLIGHT = "\033[100;93m"
+    BLUE_GREY_HIGHLIGHT = "\033[100;94m"
+
+    # Reverse colors (color highlight with white text)
+    GREEN_REVERSE = "\033[42;97m"
+    RED_REVERSE = "\033[41;97m"
+    YELLOW_REVERSE = "\033[43;97m"
+    BLUE_REVERSE = "\033[44;97m"
 
     def __init__(self, display=False):
         self.display = display
@@ -26,6 +54,10 @@ class Colors:
         if self.display:
             print(Colors.CLEAR, end='')
 
+    def set_backend_display(self, display: bool):
+        global backend_display
+        backend_display = print if display else VOID.print
+
 class RED:
     @staticmethod
     def post():
@@ -35,6 +67,15 @@ class RED:
         print(Colors.RED, end='\r')
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
+    @staticmethod
+    def print_backend(*args, **kwargs):
+        global backend_display
+        backend_display(Colors.RED_GREY_HIGHLIGHT, end='\r')
+        backend_display(*args, **kwargs)
+        backend_display(Colors.CLEAR, end='\r')
+    @staticmethod
+    def err(s: str):
+        print(f'{Colors.RED_REVERSE}{s}{Colors.CLEAR}')
 class GREEN:
     @staticmethod
     def post():
@@ -44,6 +85,14 @@ class GREEN:
         print(Colors.GREEN, end='\r')
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
+    @staticmethod
+    def print_backend(*args, **kwargs):
+        global backend_display
+        backend_display(Colors.GREEN_GREY_HIGHLIGHT, end='\r')
+        backend_display(*args, Colors.CLEAR, **kwargs)
+    @staticmethod
+    def err(s: str):
+        print(f'{Colors.GREEN_REVERSE}{s}{Colors.CLEAR}')
 class YELLOW:
     @staticmethod
     def post():
@@ -53,6 +102,15 @@ class YELLOW:
         print(Colors.YELLOW, end='\r')
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
+    @staticmethod
+    def print_backend(*args, **kwargs):
+        global backend_display
+        backend_display(Colors.YELLOW_GREY_HIGHLIGHT, end='\r')
+        backend_display(*args, **kwargs)
+        backend_display(Colors.CLEAR, end='\r')
+    @staticmethod
+    def err(s: str):
+        print(f'{Colors.YELLOW_REVERSE}{s}{Colors.CLEAR}')
 class DARK_YELLOW_BOLD:
     @staticmethod
     def post():
@@ -60,17 +118,25 @@ class DARK_YELLOW_BOLD:
     @staticmethod
     def print(*args, **kwargs):
         print(Colors.DARK_YELLOW_BOLD, end='\r')
-        print(*args, **kwargs)
-        print(Colors.CLEAR, end='\r')
+        print(*args, Colors.CLEAR, **kwargs)
+    @staticmethod
+    def print_backend(*args, **kwargs):
+        pass
 class BOLD:
     @staticmethod
     def post():
-        print(Colors.BOLD, end='')
+        print(Colors.BOLD, end='\r')
     @staticmethod
     def print(*args, **kwargs):
         print(Colors.BOLD, end='\r')
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
+    @staticmethod
+    def print_backend(*args, **kwargs):
+        global backend_display
+        backend_display(Colors.BOLD, end='\r')
+        backend_display(*args, **kwargs)
+        backend_display(Colors.CLEAR, end='\r')
 class BLUE:
     @staticmethod
     def post():
@@ -80,10 +146,11 @@ class BLUE:
         print(Colors.BLUE, end='\r')
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
-class VOID:
     @staticmethod
-    def post():
-        pass
+    def print_backend(*args, **kwargs):
+        global backend_display
+        backend_display(Colors.BLUE_GREY_HIGHLIGHT, end='\r')
+        backend_display(*args, Colors.CLEAR, **kwargs)
     @staticmethod
-    def print(*args, **kwargs):
-        pass
+    def err(s: str):
+        print(f'{Colors.BLUE_REVERSE}{s}{Colors.CLEAR}')

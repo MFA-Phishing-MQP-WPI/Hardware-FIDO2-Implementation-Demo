@@ -7,7 +7,7 @@ class VOID:
     def print(*args, **kwargs):
         pass
     @staticmethod
-    def print_backend(header: str, s: str):
+    def print_backend(prefix: str, header: str, s: str):
         pass
     @staticmethod
     def err(*args, **kwargs):
@@ -85,9 +85,9 @@ class RED:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(header: str, s: str):
+    def print_backend(prefix: str, header: str, s: str):
         global backend_display
-        backend_display(f'{Colors.RED_GREY_HIGHLIGHT}{header}{Colors.RED}{s}{Colors.CLEAR}')
+        backend_display(f'\r{Colors.RED}{prefix}{Colors.RED_GREY_HIGHLIGHT}{header}{Colors.RED}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.RED_REVERSE}{s}{Colors.CLEAR}')
@@ -101,9 +101,9 @@ class GREEN:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(header: str, s: str):
+    def print_backend(prefix: str, header: str, s: str):
         global backend_display
-        backend_display(f'{Colors.GREEN_GREY_HIGHLIGHT}{header}{Colors.CLEAR}{Colors.GREEN}{s}{Colors.CLEAR}')
+        backend_display(f'\r{Colors.GREEN}{prefix}{Colors.GREEN_GREY_HIGHLIGHT}{header}{Colors.CLEAR}{Colors.GREEN}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.GREEN_REVERSE}{s}{Colors.CLEAR}')
@@ -117,9 +117,9 @@ class YELLOW:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(header: str, s: str):
+    def print_backend(prefix: str, header: str, s: str):
         global backend_display
-        backend_display(f'{Colors.YELLOW_GREY_HIGHLIGHT}{header}{Colors.YELLOW}{s}{Colors.CLEAR}')
+        backend_display(f'\r{Colors.YELLOW}{prefix}{Colors.YELLOW_GREY_HIGHLIGHT}{header}{Colors.YELLOW}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.YELLOW_REVERSE}{s}{Colors.CLEAR}')
@@ -132,7 +132,7 @@ class DARK_YELLOW_BOLD:
         print(Colors.DARK_YELLOW_BOLD, end='\r')
         print(*args, Colors.CLEAR, **kwargs)
     @staticmethod
-    def print_backend(header: str, s: str):
+    def print_backend(prefix: str, header: str, s: str):
         pass
 class BOLD:
     @staticmethod
@@ -144,9 +144,9 @@ class BOLD:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(header: str, s: str):
+    def print_backend(prefix: str, header: str, s: str):
         global backend_display
-        backend_display(f'{Colors.BOLD}{header}{s}{Colors.CLEAR}')
+        backend_display(f'\r{Colors.BOLD}{prefix}{header}{s}{Colors.CLEAR}')
 class BLUE:
     @staticmethod
     def post():
@@ -157,9 +157,9 @@ class BLUE:
         print(*args, **kwargs)
         print(Colors.CLEAR, end='\r')
     @staticmethod
-    def print_backend(header: str, s: str):
+    def print_backend(prefix: str, header: str, s: str):
         global backend_display
-        backend_display(f'{Colors.BLUE_GREY_HIGHLIGHT}{header}{Colors.BLUE}{s}{Colors.CLEAR}')
+        backend_display(f'\r{Colors.BLUE}{prefix}{Colors.BLUE_GREY_HIGHLIGHT}{header}{Colors.BLUE}{s}{Colors.CLEAR}')
     @staticmethod
     def err(s: str):
         print(f'{Colors.BLUE_REVERSE}{s}{Colors.CLEAR}')

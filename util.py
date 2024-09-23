@@ -1,3 +1,8 @@
+# SECTION::DEF make sure everything is installed before importing
+import packagemanager
+
+
+# SECTION::DEF import libraries
 import os
 import re
 import base64
@@ -17,12 +22,17 @@ from enum import Enum
 from typing import Optional, List, Dict
 from display import Colors
 
+
+
+# SECTION::DEF global variables
 state_saved: bool = False
 display_backend: bool = True
-
 console: Colors = Colors(display=True, backend=True)
 WEBSITES: Dict[str, 'RelyingParty'] = {}
 
+
+
+# SECTION::DEF begin class definitions
 class ConnectionAction(Enum):
     # can always do
     Close_Connection = 0
@@ -43,7 +53,7 @@ class Hasher:
     def __init__(self, password: str, salt: Optional[bytes] = None, display: bool = True):
         if salt is None:
             salt = os.urandom(32)
-            Hasher.print_backend(display, f'No salt provided ... Generating random salt: {salt.hex()}')
+            Hasher.print_backend(display, f'No salt provided ... Generating random salt: 0x{salt.hex()}')
         Hasher.print_backend(display, f'Initializing Hasher object from password="{password}" and salt={salt.hex()}...')
         self.salt = salt
         self.hashed_password = self._hash_password(password, salt)
@@ -90,7 +100,7 @@ class Hasher:
     def print_backend(display: bool, message: str) -> None:
         if display:
             print('       ', end='')
-            console.log('RelyingParty').print_backend('$RP(g).crypto_backend:', f" {message}")
+            console.log('RelyingParty').print_backend('       $RP(g).', 'crypto_backend.HashObject:   ', f" {message}")
 
 class YubiKeyResponse:
     signature: bytes
@@ -275,6 +285,8 @@ class SessionToken:
         self._expires_on = int(datetime.datetime.now(datetime.timezone.utc).timestamp()) + hours * 3600
         self._data = data
         self._value_string = f'Account={self.for_account},atype={self.auth_type},expires={self._expires_on},nonce={self._data.hex()}'
+        RP: RelyingParty = by_connection.website
+        console.log('RelyingParty').print_backend('       $RP(g).', 'crypto_backend.SessionToken: ', f" Generating SessionToken with auth_type={self.auth_type} for user={account}. Note: this user requires auth_type={auth_type_required}")
     
     def __str__(self) -> str:
         return f'<SessionToken>Username={self.for_account},Type={self.auth_type},RequiredType={self.account_requires},Nonces={self.nonces},Active={self.active}</SessionToken>'
@@ -378,6 +390,7 @@ class RelyingParty:
             self.p(f'Account Information:')
             self.p(f'\tUsername: {acc.name}')
             self.p(f'\tPassword Hash: {acc.password_hash}')
+            self.p(f'\tPassword Salt: {acc.password_salt}')
             self.p(f'\tPublic Key: {acc.public_key}')
             return True
         except KeyboardInterrupt as ki:
@@ -482,6 +495,10 @@ class RelyingParty:
             console.clear()
             if not self.add_account(username, password):
                 return False
+            time.sleep(0.1)
+            self.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}){Colors.CLEAR}')
+            self.p(f'Sending message to Client({self.name}): "ACCOUNT {username.upper()} DOES NOT HAVE 2FA CONFIGURED"')
+            time.sleep(0.3)
             console.log(self.classname).print(f'{self.INDENT}$RP({self.name})::WARNING ACCOUNT {username.upper()} DOES NOT HAVE 2FA CONFIGURED')
             self.p(f'Account {username} created successfully!')
             self.show_table_question()
@@ -792,12 +809,14 @@ class Client:
                 session_token: SessionToken = RP.grant_session_token_MFA(username, session_token, response, connection)
                 if not session_token:
                     console.log('Client').print(f'  $Client({self.name}): SIGN IN FAILED!!!!!!!!')
-                console.log('Client').print("  $Client({self.name}): SIGN IN SUCCESS!!!!!!!!")
+                console.log('Client').print(f"  $Client({self.name}): SIGN IN SUCCESS!!!!!!!!")
             else:
+                RP.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}){Colors.CLEAR}')
                 console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username} does not have 2FA configured -> skipping 2FA')
             console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username} Access Granted!')
         except KeyboardInterrupt as ki:
             return None
+        console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): Passing SessionToken({get_rand_id(18)}) to Client')
         return session_token
 
 
@@ -891,7 +910,22 @@ class UserFacingConnection:
         if action == ConnectionAction.Update_MFA:
             return self.connection.website.update_account_MFA(self.connection.session_token)
 
-    def available_actions(self) -> List[ConnectionAction]:
+    def available_actions(self, client: Client, rp: RelyingParty) -> List[ConnectionAction]:
+        print('')
+        if self.is_logged_in():
+            console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
+            time.sleep(0.1)
+            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for logged in user={self.connection.session_token.for_account}")
+            time.sleep(0.1)
+            console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
+        else:
+            console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
+            time.sleep(0.1)
+            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for no user")
+            time.sleep(0.1)
+            console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
+            
+        print('')
         return [
             ConnectionAction.Login,
             ConnectionAction.CreateNewAccount,

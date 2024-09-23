@@ -1,5 +1,4 @@
 # from util import YubiKey, is_signed, RelyingParty
-import packagemanager
 from util import UserInterface, RunContext, UserFacingConnection, ConnectionAction, state_saved
 from typing import Dict, List, Optional
 import time
@@ -18,8 +17,8 @@ class Demo:
 
     def _display_inventory(self):
         print("\nINVENTORY:")
-        print(f'\tBrowsers          ({len(self.browsers)}) {self.browsers}')
         print(f'\tYubiKeys          ({len(self.ykIDs)}) {self.ykIDs}')
+        print(f'\tBrowsers          ({len(self.browsers)}) {self.browsers}')
         print(f'\tVisited Websites: ({len(self.visited_websites)}) {self.visited_websites}')
         print(f'\tOpen Connections: ({len(self.connections)}) {self.connections}')
         print('')
@@ -55,67 +54,77 @@ class Demo:
 
 
     def run(self):
-        while True:
-            self._display_inventory()
-            action = self._choose(
-                'Choose an action:',
-                ['add yubikey', 'show yubikeys', 'connect to website', 'install new browser', 'save state', 'exit'],
-                '  Enter the number of your choice > '
-            )
-            if action == 'add yubikey':
-                self.add_yubiKey()
-                continue
-            if action == 'show yubikeys':
-                self.show_yubikeys()
-                continue
-            if action == 'install new browser':
-                self.install_new_browser()
-                continue
-            elif action == 'connect to website':
-                self.connect_to_website()
-                continue
-            elif action == 'save state':
-                self.save_state()
-                continue
-            elif action == 'exit' and not state_saved:
-                self.possible_save_state()
-            break
+        try:
+            while True:
+                self._display_inventory()
+                action = self._choose(
+                    'Choose an action:',
+                    # removed 'show yubikeys' from list (below) - it's redundant
+                    ['add yubikey', 'install new browser', 'connect to website', 'save state', 'exit'],
+                    '  Enter the number of your choice > '
+                )
+                if action == 'add yubikey':
+                    self.add_yubiKey()
+                    continue
+                if action == 'show yubikeys':
+                    self.show_yubikeys()
+                    continue
+                if action == 'install new browser':
+                    self.install_new_browser()
+                    continue
+                elif action == 'connect to website':
+                    self.connect_to_website()
+                    continue
+                elif action == 'save state':
+                    self.save_state()
+                    continue
+                elif action == 'exit' and not state_saved:
+                    self.possible_save_state()
+                break
+        except KeyboardInterrupt:
+            print(f'\n>> {COLOR_CODES.WARN}WARNING: User has inturrupted the program{COLOR_CODES.RESET}')
+            self.possible_save_state()
         print('Exiting...')
 
     def possible_save_state(self):
-        print(f'>> {COLOR_CODES.WARN}WARNING: This state has unsaved changes!{COLOR_CODES.RESET}')
-        if input('Do you want to save the current state to a file? (Y/n) > ').lower() in ['y', 'yes']:
-            self.save_state()
+        try:
+            print(f'>> {COLOR_CODES.WARN}WARNING: This state has unsaved changes!{COLOR_CODES.RESET}')
+            if input('Do you want to save the current state to a file? (Y/n) > ').lower() in ['y', 'yes']:
+                self.save_state()
+        except KeyboardInterrupt:
+            pass
 
     def save_state(self):
-        from util import Tracker
-        print('Collecting data', end='\r')
-        time.sleep(0.29)
-        print('Collecting data.', end='\r')
-        time.sleep(0.17)
-        print('Collecting data..', end='\r')
-        time.sleep(0.51)
-        print('Collecting data...', end='\r')
-        time.sleep(0.17)
-        RPs: List[str] = [rp.__str__() for rp in Tracker]
-        RPs_str = ''
-        for rp in RPs:
-            RPs_str += f'<RelyingParty>{rp}</RelyingParty>\n'
+        try:
+            from util import Tracker
+            print('Collecting data', end='\r')
+            time.sleep(0.29)
+            print('Collecting data.', end='\r')
+            time.sleep(0.17)
+            print('Collecting data..', end='\r')
+            time.sleep(0.51)
+            print('Collecting data...', end='\r')
+            time.sleep(0.17)
+            RPs: List[str] = [rp.__str__() for rp in Tracker]
+            RPs_str = ''
+            for rp in RPs:
+                RPs_str += f'<RelyingParty>{rp}</RelyingParty>\n'
 
-        while True:
-            name = input('Enter filedump name: ')
-            file = f'{name}.dump' if not name.endswith('.dump') else name
-            if os.path.exists(file):
-                if input(f'File({file}) already exists, override with current state (Y/n)? ').lower() in ['y', 'yes']:
+            while True:
+                name = input('Enter filedump name: ')
+                file = f'{name}.dump' if not name.endswith('.dump') else name
+                if os.path.exists(file):
+                    if input(f'File({file}) already exists, override with current state (Y/n)? ').lower() in ['y', 'yes']:
+                        break
+                else:
                     break
-            else:
-                break
-        self.write_state_to_file(file, RPs_str)
-        global state_saved
-        state_saved = True
-        print('>> RETURNING TO MAIN MENU...\n')
-        time.sleep(1)
-        return
+            self.write_state_to_file(file, RPs_str)
+            global state_saved
+            state_saved = True
+            print('>> RETURNING TO MAIN MENU...\n')
+            time.sleep(1)
+        except KeyboardInterrupt:
+            print(f'\n>> {COLOR_CODES.WARN}WARNING: User has inturrupted program while saving state. State may not have saved correctly.{COLOR_CODES.RESET}')
     
     def write_state_to_file(self, file: str, relying_partys_string: str):
         with open(file, 'w') as f:
@@ -126,8 +135,6 @@ class Demo:
 
     def install_new_browser(self):
         try:
-            # if len(self.browsers) == 0: 
-            #     print("You don't have any browsers installed")
             browser = input("Enter browser name to install: ")
             self.ui.boot_client(client_name=browser)
             if browser not in self.browsers:
@@ -214,10 +221,10 @@ class Demo:
         
         
     def get_action_from_portal(self, portal: UserFacingConnection) -> str:
-        actions = [action.name for action in portal.available_actions()]
-        action_header = f'Welcome to {portal.connection.website.name}! What action would you like to?'
+        actions = [action.name for action in portal.available_actions(portal.connection.client, portal.connection.website)]
+        action_header = f'Welcome to {portal.connection.website.name}! What action would you like to run?'
         if portal.is_logged_in():
-            action_header = f'Hello {portal.connection.session_token.for_account}! What action would you like to:'
+            action_header = f'Hello {portal.connection.session_token.for_account}! What action would you like to run:'
         return self._choose(
             action_header,
             actions,
@@ -285,6 +292,9 @@ def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto
     # ui.boot_client(client_name=browser)
     # Microsoft_Portal: UserFacingConnection = ui.connect_to_internet(browser, 'login.microsoft.com')
     # Microsoft_Portal.execute(ConnectionAction.CreateNewAccount)
+
+    if _display_crypto_backend:
+        print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: cryptographic backend will be displayed{COLOR_CODES.RESET}')
 
     if not session:
         if not context:

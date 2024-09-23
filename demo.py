@@ -1,10 +1,12 @@
 # from util import YubiKey, is_signed, RelyingParty
-from util import UserInterface, RunContext, UserFacingConnection, ConnectionAction
+import packagemanager
+from util import UserInterface, RunContext, UserFacingConnection, ConnectionAction, state_saved
 from typing import Dict, List, Optional
 import time
 import os
 import sys
-import random
+from arg import Parser
+from display import COLOR_CODES
 
 class Demo:
     def __init__(self, context: RunContext):
@@ -75,8 +77,15 @@ class Demo:
             elif action == 'save state':
                 self.save_state()
                 continue
+            elif action == 'exit' and not state_saved:
+                self.possible_save_state()
             break
         print('Exiting...')
+
+    def possible_save_state(self):
+        print(f'>> {COLOR_CODES.WARN}WARNING: This state has unsaved changes!{COLOR_CODES.RESET}')
+        if input('Do you want to save the current state to a file? (Y/n) > ').lower() in ['y', 'yes']:
+            self.save_state()
 
     def save_state(self):
         from util import Tracker
@@ -102,6 +111,8 @@ class Demo:
             else:
                 break
         self.write_state_to_file(file, RPs_str)
+        global state_saved
+        state_saved = True
         print('>> RETURNING TO MAIN MENU...\n')
         time.sleep(1)
         return
@@ -179,7 +190,8 @@ class Demo:
                 ConnectionAction.Logout,
                 ConnectionAction.Update_MFA,
                 ConnectionAction.Update_Password,
-                ConnectionAction.Show_Account_Tables
+                ConnectionAction.Show_Account_Tables,
+                ConnectionAction.View_Account_Info
             ]
             while True:
                 action: str = self.get_action_from_portal(Portal)
@@ -190,7 +202,7 @@ class Demo:
                         if Portal.execute(possible_action):
                             print('\n <<< ACTION COMPLETED >>>\n')
                         else:
-                            print('\n <<< ACTION UNSUCCESSFUL DUE TO python.exceptions.KeyboardInterrupt >>>\n')
+                            print('\n <<< ACTION UNSUCCESSFUL >>>\n')
                         break
             print(f'Closing connection to {website_name}...')
             print('>> RETURNING TO MAIN MENU...\n')
@@ -211,6 +223,9 @@ class Demo:
             actions,
             '  Enter the number of your choice > '
         )
+    
+    def update_backend_settings(self, display: bool):
+        self.ui.update_backend_settings(display)
     
     @staticmethod
     def generate_from_dump(filename: str) -> 'Demo':
@@ -233,7 +248,7 @@ class Demo:
                 continue
             RelyingParty.from_string(RP_string)
         if input('Continue? (Y/n) > ').lower() in ['y', 'yes']:
-            print('\n'*20)
+            print('\n'*25)
             return d
         exit(1)
     
@@ -247,7 +262,7 @@ class Demo:
 
 
 
-def main(session: Optional[Demo], context: Optional[RunContext]):
+def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto_backend: bool):
     # yk = YubiKey(secret=b'\xad\x1d0\x9d\xaa\xa3\xea\xac\x8axj\x89-h\xabm\xa6-\xa8\xa2\xf8-\x94(\x8b\xed\x9an\x1e\xcb\x1b\xd6')
     # pri, pub = yk._generate_key_pair('Microsoft', 'jdoe@wpi.edu')
     # nonce = os.urandom(8)
@@ -275,6 +290,7 @@ def main(session: Optional[Demo], context: Optional[RunContext]):
         if not context:
             context = RunContext.AUTO_DETECT
         session = Demo(context)
+    session.update_backend_settings(_display_crypto_backend)
     session.run()
 
 
@@ -282,20 +298,10 @@ def generate_session_from_file(filename: Optional[str]) -> Optional[Demo]:
     if not filename:
         return None
     return Demo.generate_from_dump(filename)
-
-def check_for_filename() -> Optional[str]:
-    if len(sys.argv) == 1:
-        return None
-    if len(sys.argv) != 3 or sys.argv[1] != '--launch-from-save' or not sys.argv[2].endswith('.dump'):
-        print(f'USAGE: python3 demo.py')
-        print(f'USAGE: python3 demo.py --launch-from-save <SAVE_FILENAME>.dump')
-        exit(1)
-    if not os.path.exists(sys.argv[2]):
-        print(f'Could not find file "{sys.argv[2]}"')
-    return sys.argv[2]
     
 
 if __name__ == "__main__":
-    filename: Optional[str] = check_for_filename()
-    main(generate_session_from_file(filename), RunContext.AUTO_DETECT)
+    args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 2, 3, 4])
+    filename: Optional[str] = args['--launch-from-save']
+    main(generate_session_from_file(filename), RunContext.AUTO_DETECT, args['-display_crypto_backend'])
     

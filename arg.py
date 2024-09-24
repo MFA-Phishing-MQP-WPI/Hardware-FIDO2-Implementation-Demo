@@ -7,13 +7,15 @@ import os
 run_conditions: Dict[str, any] = {
     "--launch-from-save": None,
     "-display_crypto_backend": False,
-    '-help': False
+    '-help': False,
+    '-debug_mode': False
 }
 
 help_runers: Tuple[Dict[str, str], Dict[str, Tuple[str, str]]] = (
     {
         '-help': 'prints this help message',
-        '-display_crypto_backend': 'displays actions completd by the cryptographic backend'
+        '-display_crypto_backend': 'displays actions completd by the cryptographic backend',
+        '-debug_mode': 'prints the value of all private keys at runtime start'
     },
     {
         '--launch-from-save [.dump file]': 

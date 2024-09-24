@@ -152,18 +152,18 @@ class YubiKey:
             console.log('YubiKey').print_backend(
                 f'$YK({self.ID})', 
                 '.crypto_backend.approval :', 
-                f'Calculating private key for RP({request.RP_ID}) + User="{request.username}" {cursor[i%len(cursor)]}',
+                f'Calculating private key for RP({request.RP_ID}) + User="{request.username}@{request.RP_ID}" {cursor[i%len(cursor)]}',
                 end='\r')
             time.sleep(0.1)
         console.log('YubiKey').print_backend(
             f'$YK({self.ID})', 
             '.crypto_backend.approval :', 
-            f'Calculating private key for RP({request.RP_ID}) + User="{request.username}"  ')
+            f'Calculating private key for RP({request.RP_ID}) + User="{request.username}@{request.RP_ID}"  ')
         id = {get_rand_id(10)}
         console.log('YubiKey').print_backend(
             f'$YK({self.ID})', 
             '.crypto_backend.approval :', 
-            f'Calculated PrivateKey({id}) for RP({request.RP_ID}) + User="{request.username}"')
+            f'Calculated PrivateKey({id}) for RP({request.RP_ID}) + User="{request.username}@{request.RP_ID}"')
         for i in range(7):
             console.log('YubiKey').print_backend(
                 f'$YK({self.ID})', 
@@ -398,7 +398,12 @@ class Challenge:
         nonce_cut = f'{Nonce}'[:20] + '...'
         console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f' Generating challenge ...')
         time.sleep(0.2)
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'    Challenge(user={username}@{self.RP_ID}, SessionToken({token_1FA.ID}), Nonce(id={NonceID}, bytes_value={nonce_cut})')
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'     Challenge(')
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         user={username}@{self.RP_ID}, ')
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         SessionToken({token_1FA.ID}),')
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         Nonce(id={NonceID},')
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         bytes_value={nonce_cut}')
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'     )')
         console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f' Signing challenge using RP({self.RP_ID})')
 
 
@@ -519,7 +524,7 @@ class RelyingParty:
             self.p(f'Recieved approval from Client({client.name})')
             self.accounts[session.for_account].public_key = approval.public_key
             self.accounts[session.for_account].public_key_to_display = f'YK({approval.YubiKeyID})'
-            self.p(f'Updated user settings for user="{session.for_account}@{self.name}" to public_key="{approval.public_key}"')
+            self.p(f'Updated user settings for user="{session.for_account}@{self.name}" to public_key="0x{YubiKey.public_key_to_bytes(approval.public_key).hex()}"')
             self.show_table_question()
             global state_saved
             state_saved = False
@@ -710,16 +715,16 @@ class RelyingParty:
             ) -> Optional[SessionToken]:
         try:
             if session.timmed_out():
-                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'SessionToken(id={session.ID}, type={session.auth_type}) timmed out')
-                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'Cannot grant MFA SessionToken to user with expired SessionToken')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) timmed out')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Cannot grant MFA SessionToken to user with expired SessionToken')
                 return None
             if not session.is_valid(username, '1FA'):
-                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'SessionToken(id={session.ID}, type={session.auth_type}) is not valid for this user')
-                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'Cannot grant MFA SessionToken without a valid 1FA SessionToken')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is not valid for this user')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Cannot grant MFA SessionToken without a valid 1FA SessionToken')
                 return None
             
-            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'SessionToken(id={session.ID}, type={session.auth_type}) is valid for this user')
-            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'Checking YubiKey signature ...')
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is valid for this user')
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Checking YubiKey signature ...')
             time.sleep(0.2)
             if is_signed(
                 response.nonce,
@@ -729,8 +734,16 @@ class RelyingParty:
             ):
                 return SessionToken(session.for_account, 1, 'MFA', 'MFA', connection)
         except KeyboardInterrupt as ki:
-            pass
-        return None # failed MFA verification (YubiKey response not valid)
+            console.log('RelyingParty').print(f"    $RP({self.name}): MFA Inturrupted ... login failed")
+            console.log('RelyingParty').print(f"    $RP({self.name}): Revoked SessionToken(Type=1FA)")
+            return None
+        console.log('RelyingParty').print(f"    $RP({self.name}): Cryptographic backend returned an error: Excations.Cryptographic_backend.NotDecrypted")
+        global cursor
+        for i in range(10):
+            console.log('RelyingParty').print(f"    $RP({self.name}): Revoking SessionToken(Type=1FA) {cursor[i%len(cursor)]}", end='\r')
+        console.log('RelyingParty').print(f"    $RP({self.name}): Revoked SessionToken(Type=1FA)    ")
+        console.log('RelyingParty').print(f"    $RP({self.name}): MFA Failed.")
+        return None
         
     def request_challenge(self, username: str, token: bytes, yk: YubiKey) -> Optional[Challenge]:
         self.p(f'Locating SessionToken(type=1FA) for user {username} that matches signature {token}')
@@ -739,9 +752,9 @@ class RelyingParty:
             self.p('Permission denied - session token not found or expired')
             return None
         self.p(f'Located SessionToken({TK.ID}) for user {username} that matches signature {token}')
-        console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.ChallengeGen: ', 'Generating challenge ...')
+        console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.ChallengeGen: ', ' Generating challenge ...')
         nonce = os.urandom(32)
-        console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.ChallengeGen: ', f'Generated nonce: {nonce}')
+        console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.ChallengeGen: ', f' Generated nonce: {nonce}')
         console.log(self.classname).print(f'     $RP({self.name}): generating challenge for usr="{username}", YubiKey({yk.ID})')
         return Challenge(
             self,
@@ -796,7 +809,7 @@ class Connection:
     def request_yubikey_insert_from_OS(self, username: str) -> Optional[int]:
         c_name: str = self.client.name
         rp_name: str = self.website.name
-        console.log('Client').print(f'   $Client({c_name}): Got request from RP({rp_name}) for username: {username} to enter YubiKey to request Challenge.')
+        console.log('Client').print(f'   $Client({c_name}): Got request from RP({rp_name}) for username: {username}@{rp_name} to enter YubiKey to request Challenge.')
         console.log('Client').print(f'   $Client({c_name}): Passing request to Operating System on behalf of RP({rp_name})...')
         time.sleep(0.2)
         return self.UI_ptr.insert_yubikey(self, username)
@@ -889,13 +902,13 @@ class Client:
                 break
             console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): Username and password hash match...')
             if RP.requires_2FA(username):
-                console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}" requires 2FA...')
+                console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}@{RP.name}" requires 2FA...')
                 console.log(RP.classname).print(f'     $RP({RP.name}): Sending request to client for user to insert and auth using YubiKey for the respective account...')
                 time.sleep(0.1)
                 YK: Optional[YubiKey] = connection.request_yubikey_insert_from_OS(username)
                 if not YK:
                     time.sleep(1.2)
-                    console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}" timmed out')
+                    console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}@{RP.name}" timmed out')
                     console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                     return None
                 challenge: Optional[Challenge] = RP.request_challenge(username, session_token, YK) # will print generating challenge
@@ -909,18 +922,18 @@ class Client:
                     return None
                 console.log('Client').print(f'   $Client({self.name}): Recieved challenge from RP({RP.name})')
                 console.log('Client').print(f'   $Client({self.name}): Verifying source of challenge . . .')
-                self.print_backend(f' Comunicating with: RP({RP.name})')
-                self.print_backend(f' Challenge signed by RP({challenge.RP_ID})')
+                self.print_backend(f'Comunicating with: RP({RP.name})')
+                self.print_backend(f'Challenge signed by RP({challenge.RP_ID})')
                 if challenge.RP_ID != RP.name:
-                    self.print_backend(f' RP({RP.name}) != RP({challenge.RP_ID})')
-                    self.print_backend(f' THROW Exceptions.CryptographicBackend.UnknownRelyingParty')
+                    self.print_backend(f'RP({RP.name}) != RP({challenge.RP_ID})')
+                    self.print_backend(f'THROW Exceptions.CryptographicBackend.UnknownRelyingParty')
                     console.log('Client').print(f'   $Client({self.name}): failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
                     space = ' ' * len(f'   $Client({self.name}): ')
                     console.log('Client').print(f'{space}... ignoring challenge')
                     console.log(RP.classname).print(f'     $RP({RP.name}): usr="{username}" timmed out')
                     console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                     return None
-                self.print_backend(f' RP({RP.name}) == RP({challenge.RP_ID})')
+                self.print_backend(f'RP({RP.name}) == RP({challenge.RP_ID})')
                 console.log('Client').print(f'   $Client({self.name}): Successfully verified challenge sender as RP({RP.name}). Challenge originating ID matches communicating sub-domain.')
                 space = ' ' * len(f'   $Client({self.name}): ')
                 global cursor
@@ -946,13 +959,13 @@ class Client:
                 response: YubiKeyResponse = connection.request_yubikey_auth_from_OS(YK.ID, challenge)
                 session_token: Optional[SessionToken] = RP.grant_session_token_MFA(username, session_token, response, connection)
                 if not session_token:
-                    console.log('Client').print(f'  $Client({self.name}): Recieved "HTML 403" as a response from RP({RP.name})')
+                    console.log('Client').print(f'   $Client({self.name}): Recieved "HTML 403" as a response from RP({RP.name})')
                     return None
                 console.log('Client').print(f"  $Client({self.name}): MFA login successful!")
             else:
                 RP.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}@{RP.name}){Colors.CLEAR}')
-                console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username} does not have 2FA configured -> skipping 2FA')
-            console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username} Access Granted!')
+                console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username}@{RP.name} does not have 2FA configured -> skipping 2FA')
+            console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username}@{RP.name} Access Granted!')
         except KeyboardInterrupt as ki:
             return None
         console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): Passing SessionToken({get_rand_id(18)}) to Client')
@@ -978,7 +991,7 @@ def is_signed(nonce: bytes, public_key, response: bytes, RP_name: str = '') -> b
         console.log('RelyingParty').print_backend(
             f'       $RP({RP_name}).', 
             'crypto_backend.AsymetricDecr:', 
-            f'Trying to decrypt response="0x{response.hex()}" using public key on file {public_key}'
+            f' Trying to decrypt response="0x{response.hex()}" using public key on file 0x{YubiKey.public_key_to_bytes(public_key).hex()}'
         )
         # Verify the signature using the public key
         public_key.verify(
@@ -989,19 +1002,19 @@ def is_signed(nonce: bytes, public_key, response: bytes, RP_name: str = '') -> b
         console.log('RelyingParty').print_backend(
             f'       $RP({RP_name}).', 
             'crypto_backend.SessionToken: ', 
-            f'Decrypted response successfully'
+            f' Decrypted response successfully'
         )
         console.log('RelyingParty').print_backend(
             f'       $RP({RP_name}).', 
             'crypto_backend.SessionToken: ', 
-            f'Decrypted response is equal to nonce that was originally sent to the user'
+            f' Decrypted response is equal to nonce that was originally sent to the user'
         )
         return True
     except InvalidSignature:
         console.log('RelyingParty').print_backend(
             f'       $RP({RP_name}).', 
             'crypto_backend.SessionToken: ', 
-            f'Decryption failed'
+            f' Decryption failed'
         )
         return False
     

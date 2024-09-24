@@ -18,6 +18,7 @@
 6. [Future Work](#future-work)
 7. [Troubleshooting](#troubleshooting)
 8. [Already Implemented](#already-implemented)
+9. [Resources](#Resources)
 
 ## Overview
 
@@ -188,6 +189,14 @@ These packages are automatically installed by running the demo if they aren't al
 #### ✔️ Change Password
 #### ✔️ View Account Info
 #### ❌ Additional Secure Actions
+
+
+## Resources
+
+* [FIDO2 Specifications and Background](https://fidoalliance.org/specifications/)
+* [FIDO2 Authentication Specifications](https://fidoalliance.org/fido2/)
+* [WebAuthn Confluence Main](https://www.w3.org/TR/webauthn/)
+
 
 
 

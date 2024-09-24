@@ -12,6 +12,23 @@ The demo showcases the fundamental mechanisms of a cryptographic challenge-respo
 
 <br>
 
+## How to Run the Demo
+
+To run the demo:
+1. Clone this repository and ensure you have Python 3 installed.
+2. Run the demo: 
+   ```bash
+   python3 demo.py
+   ```
+3. Looking for more options? 
+   ```bash
+   python3 demo.py -help
+   ```
+
+<br>
+
+<br>
+
 ## Important Classes and Their Functions
 
 ### 1. **UserInterface**
@@ -74,23 +91,6 @@ The demo shows the flow of a user logging into a website with 1FA (username and 
 7. **Challenge Signing**: The YubiKey signs the challenge with its private key, generating a `YubiKeyResponse` with the signed nonce.
 
 8. **MFA Validation**: The Relying Party verifies the signature and, if correct, grants the user a long-term session token (MFA).
-
-<br>
-
-<br>
-
-## How to Run the Demo
-
-To run the demo:
-1. Clone this repository and ensure you have Python installed.
-2. Install dependencies:
-   ```bash
-   pip install cryptography
-   ```
-3. Run the demo: 
-   ```bash
-   python3 demo.py -default
-   ```
 
 <br>
 

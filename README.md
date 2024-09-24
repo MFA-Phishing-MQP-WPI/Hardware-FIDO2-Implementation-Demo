@@ -12,23 +12,6 @@ The demo showcases the fundamental mechanisms of a cryptographic challenge-respo
 
 <br>
 
-## How to Run the Demo
-
-To run the demo:
-1. Clone this repository and ensure you have Python 3 installed.
-2. Run the demo: 
-   ```bash
-   python3 demo.py
-   ```
-3. Looking for more options? 
-   ```bash
-   python3 demo.py -help
-   ```
-
-<br>
-
-<br>
-
 ## Important Classes and Their Functions
 
 ### 1. **UserInterface**
@@ -96,6 +79,23 @@ The demo shows the flow of a user logging into a website with 1FA (username and 
 
 <br>
 
+## How to Run the Demo
+
+To run the demo:
+1. Clone this repository and ensure you have Python installed.
+2. Install dependencies:
+   ```bash
+   pip install cryptography
+   ```
+3. Run the demo: 
+   ```bash
+   python3 demo.py -default
+   ```
+
+<br>
+
+<br>
+
 ## Future Work
 ###### In future iterations of this demo, the following features will be added:
 * **Color-coded print statements:** Each step and function will have color-coded print statements explaining what they are doing. For example, YubiKey operations will be printed in blue, displaying cryptographic operations, while the Relying Party (RP) will be printed in red, showing account verification and token management processes.
@@ -116,13 +116,13 @@ The demo shows the flow of a user logging into a website with 1FA (username and 
 ##### ✔️ `Close Connection` / `Go back to the main menu`
 ##### ✔️ `Add a new account`
 ##### ✔️ `Login (1FA)`
-##### ✔️ `Login (MFA)`
+##### ❌ `Login (MFA)`
 
 ### Website Logged-In Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
-##### ✔️ `Add MFA`
-##### ✔️ `Change Password`
-##### ✔️ `Update MFA`
+##### ❌ `Add MFA`
+##### ❌ `Change Password`
+##### ❌ `Update MFA`
 ##### ❌ Brainstorm other `secure account actions` like `Send an email`, `view inbox`, and other secure actions
 
 ### Backend Actions
@@ -131,15 +131,10 @@ The demo shows the flow of a user logging into a website with 1FA (username and 
 ##### ✔️ `Create new RelyingParty`
 ##### ✔️ `Administer new SessionToken`
 ##### ✔️ `Varify SessionToken Validity`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Account`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Not Expired or Timmed Out`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Still Active` `(Not Revoked)`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Website`
-
+* ###### ✔️ `SessionToken For Correct Account`
+* ###### ✔️ `SessionToken Not Expired or Timmed Out`
+* ###### ✔️ `SessionToken Still Active` `(Not Revoked)`
+* ###### ✔️ `SessionToken For Correct Website`
 ##### ✔️ `Create new UserFacingConnection`
 ##### ✔️ `Complete UserFacingConnection Actions`
 ##### ✔️ `Interface with all classes from demo class` classes: [`Browser`, `YubiKey`, `RelyingParty`, `UserInterface`, `Connection`, `UserFacingConnection`, `AccountActions`]

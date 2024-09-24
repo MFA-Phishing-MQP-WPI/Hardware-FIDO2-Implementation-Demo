@@ -1,160 +1,192 @@
 # FIDO2 Authentication Demo Using YubiKey
 
-<br>
+## Table of Contents
+1. [Overview](#overview)
+2. [How to Run the Demo](#how-to-run-the-demo)
+   - [Prerequisites](#prerequisites)
+   - [Required Packages](#required-packages)
+   - [Steps to Run](#steps-to-run)
+3. [Important Classes and Their Functions](#important-classes-and-their-functions)
+   - [UserInterface](#1-userinterface)
+   - [Client](#2-client)
+   - [RelyingParty](#3-relyingparty)
+   - [YubiKey](#4-yubikey)
+   - [SessionToken](#5-sessiontoken)
+   - [OperatingSystem](#6-operatingsystem)
+4. [How the Demo Works](#how-the-demo-works)
+5. [Visualizing Logs](#visualizing-logs)
+6. [Future Work](#future-work)
+7. [Troubleshooting](#troubleshooting)
+8. [Already Implemented](#already-implemented)
 
 ## Overview
 
-This repository contains a Python-based demo that simulates how FIDO2 authentication works using a YubiKey-like hardware security token. The `util.py` file includes the core implementation, which demonstrates the interactions between a client (browser), a relying party (web service), and a YubiKey (hardware security token) in a typical FIDO2 two-factor authentication (2FA) flow.
+This repository contains a Python-based demo that simulates FIDO2 authentication using a YubiKey-like hardware security token. The demo showcases the interaction between a client (browser), a relying party (web service), and a YubiKey in a typical two-factor authentication (2FA) flow.
 
-The demo showcases the fundamental mechanisms of a cryptographic challenge-response system, where a user logs into a website using a username, password (1FA), and YubiKey (MFA). This README explains the major components of the `util.py` file and the flow of authentication.
+The demo implements the core cryptographic challenge-response system used in FIDO2. In this system, a user logs into a website with a username and password (1FA) and authenticates using a YubiKey (MFA). This README explains the project's major components, how to run the demo, and key features such as MFA management and YubiKey interactions.
 
-<br>
-
-<br>
+---
 
 ## How to Run the Demo
 
-To run the demo:
-1. Clone this repository and ensure you have Python 3 installed.
-2. Run the demo: 
+### Prerequisites
+Here are the necessary Python packages. If you do not have them, the `package_manager.py` script will handle automatic installation for you.
+
+### Required Packages
+- `argon2-cffi`
+- `cryptography`
+- `colorama`
+
+These packages are automatically installed by running the demo if they aren't already available.
+
+### Steps to Run
+1. **Clone the repository:**
+
+   ```bash
+   git clone https://github.com/MFA-Phishing-MQP-WPI/Hardware-FIDO2-Implementation-Demo.git
+   cd Hardware-FIDO2-Implementation-Demo
+   ```
+2. **Run the demo:**
+
    ```bash
    python3 demo.py
    ```
-3. Looking for more options? 
+   
+3. **Command Line Options:**
+###### You can customize the execution of the demo using the following arguments:
+
+* ##### `--launch-from-save [file_name].dump`: Restore the demo's state from a saved `.dump` file.
+* ##### `-display_crypto_backend`: Display cryptographic backend actions.
+* ##### `-debug_mode`: Print the values of private keys at runtime start.
+* ##### `-help`: Display help and usage information.
+
+###### Sample Usage:
+
    ```bash
-   python3 demo.py -help
+   python3 demo.py --launch-from-save state.dump
    ```
-
-<br>
-
-<br>
 
 ## Important Classes and Their Functions
 
-### 1. **UserInterface**
-The `UserInterface` class manages interactions between the user and the system, simulating user input and the hardware insertion process for YubiKeys. Key features include:
-- **`new_YubiKey()`**: Creates a new YubiKey with a unique ID and secret key.
-- **`login()`**: Simulates a user logging into a website by entering their username, password, and performing 2FA with a YubiKey.
-- **`insert_yubikey()`**: Handles the process of the user inserting their YubiKey into the system.
-- **`YubiKey_auth()`**: Simulates a challenge being sent to a YubiKey for authentication.
+1. UserInterface
 
-### 2. **Client**
-The `Client` class simulates a browser or user agent, such as `Chrome.exe`, interacting with websites and performing various actions (e.g., logging in). Key features include:
-- **`connect()`**: Establishes a connection between the client and a website (relying party).
-- **`_login_user()`**: Manages the process of logging in a user, handling both 1FA (username and password) and 2FA (YubiKey authentication).
+###### Manages interactions between the user and the system, simulating user input and the hardware insertion process for YubiKeys.
 
-### 3. **RelyingParty**
-The `RelyingParty` class represents a web service (e.g., `login.microsoft.com`) that manages user accounts and the 2FA challenge process. It tracks accounts, session tokens, and YubiKey-related data. Key features include:
-- **`add_account()`**: Adds a new user account with a hashed password.
-- **`grant_session_token_1FA()`**: Grants a session token upon successful login with 1FA (username and password).
-- **`grant_session_token_MFA()`**: Validates the YubiKey challenge response and issues an MFA session token.
-- **`request_challenge()`**: Generates a cryptographic challenge for the YubiKey during the 2FA process.
+* ##### `new_YubiKey()`: Creates a new YubiKey with a unique ID and secret key.
+* ##### `login()`: Simulates a user logging into a website with username + password, and performing 2FA with a YubiKey.
+* ##### `insert_yubikey()`: Handles the user inserting their YubiKey.
+* ##### `YubiKey_auth()`: Simulates the challenge-response process with the YubiKey.
 
-### 4. **YubiKey**
-The `YubiKey` class simulates a physical YubiKey security device. It generates cryptographic key pairs, signs challenges, and authenticates users. Key features include:
-- **`_generate_key_pair()`**: Generates an EC (elliptic curve) private-public key pair using HMAC-SHA256 for deterministic key generation.
-- **`auth_2FA()`**: Handles the challenge-response process by signing a nonce (random number) from the Relying Party using the private key.
-- **`_sign()`**: Signs a cryptographic challenge using the private key stored on the YubiKey.
+2. Client
 
-### 5. **SessionToken**
-The `SessionToken` class represents a session token issued by the RelyingParty, which is used to grant access to a user. It tracks token expiration and validates the session for both 1FA and MFA. Key features include:
-- **`is_valid()`**: Checks if the token is still valid and hasn't expired.
-- **`add_nonce()`**: Adds a nonce (a unique, random number) to the token for cryptographic challenge purposes.
+###### Simulates a browser (e.g., Chrome) interacting with websites and performing actions such as logging in.
 
-### 6. **YubiKeyResponse**
-The `YubiKeyResponse` class encapsulates the response from the YubiKey after it processes a cryptographic challenge. It contains:
-- `signature`: The cryptographic signature generated by the YubiKey.
-- `nonce`: The original nonce (random number) sent by the Relying Party.
-- `YubiKeyID`: The unique ID of the YubiKey.
+* ##### `connect()`: Establishes a connection between the client and a website.
+* ##### `_login_user()`: Manages the login process with username, password, and YubiKey authentication.
 
-<br>
+3. RelyingParty
 
-<br>
+###### Represents a web service that manages user accounts and the 2FA challenge process.
+
+* ##### `add_account()`: Adds a new user account with a hashed password.
+* ##### `grant_session_token_1FA()`: Grants a session token upon successful login with 1FA.
+* ##### `grant_session_token_MFA()`: Validates the YubiKey challenge response and grants an MFA session token.
+* ##### `request_challenge()`: Generates a cryptographic challenge for the YubiKey during 2FA.
+
+4. YubiKey
+
+###### Simulates a YubiKey security token, generating key pairs and signing challenges.
+
+* ##### `_generate_key_pair()`: Generates a deterministic EC private-public key pair using HMAC-SHA256.
+* ##### `auth_2FA()`: Handles the challenge-response process by signing a nonce with the private key.
+* ##### `_sign()`: Signs a cryptographic challenge using the YubiKey's private key.
+
+5. SessionToken
+
+###### Represents a session token issued by the relying party, granting access to a user.
+
+* ##### `is_valid()`: Checks if the token is still valid.
+* ##### `add_nonce()`: Adds a nonce (a unique, random number) for cryptographic challenges.
+
+6. OperatingSystem
+
+###### Simulates the user's operating system, managing YubiKeys and client processes.
+
+* ##### `new_YubiKey()`: Creates a new YubiKey and registers it with the system.
+* ##### `boot_client()`: Starts a new client (browser) to interact with the system.
+* ##### `connect_to_internet()`: Establishes a connection between the client and the relying party.
+* ##### `approve_mfa_registration_request()`: Approves MFA registration requests made by the relying party via the client.
+
 
 ## How the Demo Works
 
-The demo shows the flow of a user logging into a website with 1FA (username and password) and then performing 2FA using a YubiKey. Here's a simplified step-by-step process:
+1. Client Connection:
+   1. The client connects to a relying party (e.g., login.microsoft.com).
 
-1. **Client Connection**: The `Client` connects to a `RelyingParty` (e.g., `login.microsoft.com`)
+2. Account Registration:
+   1. The user creates a new account by providing a username and password.
 
-2. **Account Registration**: The `User` requests to add a `username + password` combo to the `RelyingParty`, which is passed through the `Client`.
-   1. Steps are followed to ensure security during the signup process.
+3. MFA Registration:
+   1. The user adds MFA to their account by registering a YubiKey.
 
-3. **MFA Registration**: The `User` requests to add a form of MFA to their account.
-   
-4. **1FA Login**: The user inputs their username and password. If correct, a short-lived session token (1FA) is granted.
+4. Login Process:
+   1. The user logs in with their username and password (1FA). If MFA is required, the system requests the insertion of the user's YubiKey.
 
-5. **2FA Request**: If the user's account requires 2FA, the system requests the insertion of the user's YubiKey.
+5. Challenge Generation:
+   1. The relying party generates a cryptographic challenge, which is sent to the YubiKey for signing.
 
-6. **YubiKey Challenge**: The Relying Party generates a cryptographic challenge (a nonce) and sends it to the YubiKey for signing.
+6. Challenge Signing:
+   1. The YubiKey signs the challenge using its private key, and the signed response is sent back to the relying party.
 
-7. **Challenge Signing**: The YubiKey signs the challenge with its private key, generating a `YubiKeyResponse` with the signed nonce.
+7. MFA Validation:
+   1. The relying party verifies the signature. If it’s correct, the user is granted a session token and successfully logged in.
 
-8. **MFA Validation**: The Relying Party verifies the signature and, if correct, grants the user a long-term session token (MFA).
 
-<br>
+## Visualizing Logs
 
-<br>
+###### The demo includes detailed color-coded print statements that explain each step of the process:
+
+* ##### `Green`: `RelyingParty` display only.
+   * `RelyingParty`: actions such as secure storage and authentication.
+* ##### `Red`: `Errors` and `OperatingSystem` display.
+   * `Errors`: general errors.
+   * `OperatingSystem`: Interfacing with user.
+* ##### `Blue`: `Client` display only.
+   * `Client`: actions such as connection requests.
+* ##### `Yellow`: `Warnings` and `YubiKey` display.
+   * `Warnings` general warnings.
+   * `YubiKey` operations, including cryptographic signing and challenge responses.
+
+###### The backend logging system provides verbose output of the cryptographic operations, user actions, and system decisions.
+
 
 ## Future Work
-###### In future iterations of this demo, the following features will be added:
-* **Color-coded print statements:** Each step and function will have color-coded print statements explaining what they are doing. For example, YubiKey operations will be printed in blue, displaying cryptographic operations, while the Relying Party (RP) will be printed in red, showing account verification and token management processes.
+###### The following features will be added in future iterations:
 
+* Additional secure account actions, such as sending emails or viewing secure data.
 
-<br>
+## Troubleshooting
+###### If the automatic package installation fails, you can manually install the required packages with:
 
-<be>
+   ```bash
+   pip install argon2-cffi cryptography colorama
+   ```
 
 ## Already Implemented
 
 ### Main Menu Actions
-##### ✔️ `Add Browser`
-##### ✔️ `Add YubiKey`
-##### ✔️ `Connect to website`
-
-### Website Logged-Out Actions
-##### ✔️ `Close Connection` / `Go back to the main menu`
-##### ✔️ `Add a new account`
-##### ✔️ `Login (1FA)`
-##### ✔️ `Login (MFA)`
-
-### Website Logged-In Actions
-##### ✔️ `Close Connection` / `Go back to the main menu`
-##### ✔️ `Add MFA`
-##### ✔️ `Change Password`
-##### ✔️ `Update MFA`
-##### ❌ Brainstorm other `secure account actions` like `Send an email`, `view inbox`, and other secure actions
-
-### Backend Actions
-##### ✔️ `Create New Browser`
-##### ✔️ `Create new YubiKey`
-##### ✔️ `Create new RelyingParty`
-##### ✔️ `Administer new SessionToken`
-##### ✔️ `Varify SessionToken Validity`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Account`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Not Expired or Timmed Out`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken Still Active` `(Not Revoked)`
-
-###### &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✔️ `SessionToken For Correct Website`
-
-##### ✔️ `Create new UserFacingConnection`
-##### ✔️ `Complete UserFacingConnection Actions`
-##### ✔️ `Interface with all classes from demo class` classes: [`Browser`, `YubiKey`, `RelyingParty`, `UserInterface`, `Connection`, `UserFacingConnection`, `AccountActions`]
+#### ✔️ Add Browser
+#### ✔️ Add YubiKey
+#### ✔️ Connect to Website
+### Website Actions
+#### ✔️ Create New Account
+#### ✔️ Login (1FA)
+#### ✔️ Login (MFA)
+#### ✔️ Add MFA
+#### ✔️ Change Password
+#### ✔️ View Account Info
+#### ❌ Additional Secure Actions
 
 
 
 
-
-
-<br>
-
-<br>
-
-<br>
-
-<br>
-
-<br>

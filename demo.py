@@ -10,7 +10,7 @@ from display import COLOR_CODES
 class Demo:
     def __init__(self, context: RunContext):
         self.browsers: List[str] = []
-        self.ui: OperatingSystem = OperatingSystem(context)
+        self.OS: OperatingSystem = OperatingSystem(context)
         self.ykIDs: List[str] = []
         self.connections: Dict[str, UserFacingConnection] = {}
         self.visited_websites: List[str] = []
@@ -123,7 +123,7 @@ class Demo:
     
     def write_state_to_file(self, file: str, relying_partys_string: str):
         with open(file, 'w') as f:
-            f.write(f'browsers: {self.browsers}\nyubiKeys: {self.ui.YKs_to_string()}\nvisited_websites: {self.visited_websites}\nconnections: {self.connections}\n')
+            f.write(f'browsers: {self.browsers}\nyubiKeys: {self.OS.YKs_to_string()}\nvisited_websites: {self.visited_websites}\nconnections: {self.connections}\n')
             f.write(f'{relying_partys_string}')
         print(f'State saved to {file}')
 
@@ -131,7 +131,7 @@ class Demo:
     def install_new_browser(self):
         try:
             browser = input("Enter browser name to install: ")
-            self.ui.boot_client(client_name=browser)
+            self.OS.boot_client(client_name=browser)
             if browser not in self.browsers:
                 print(f"Browser '{browser}' installed successfully")
             self.browsers.append(browser)
@@ -144,7 +144,7 @@ class Demo:
 
     def add_yubiKey(self):
         try:
-            ykID: str = self.ui.new_YubiKey()
+            ykID: str = self.OS.new_YubiKey()
             self.ykIDs.append(ykID)
             print(f'You now have {len(self.ykIDs)} yubikeys paired to this device.')
             print('>> RETURNING TO MAIN MENU...\n')
@@ -178,11 +178,11 @@ class Demo:
                 self.browsers,
                 '  Enter the number of your choice > '
             )
-            self.ui.boot_client(client_name=browser)
+            self.OS.boot_client(client_name=browser)
             website_name: str = self._webselect()
             if not website_name or website_name == 'new website':
                 website_name = input("Where would you like to connect to: ")
-            Portal: UserFacingConnection = self.ui.connect_to_internet(browser, website_name)
+            Portal: UserFacingConnection = self.OS.connect_to_internet(browser, website_name)
             if website_name not in self.visited_websites: self.visited_websites.append(website_name)
             print('Established connection successfully!')
             ALL_CONECTIONACTIONS: List[ConnectionAction] = [
@@ -227,7 +227,7 @@ class Demo:
         )
     
     def update_backend_settings(self, display: bool):
-        self.ui.update_backend_settings(display)
+        self.OS.update_backend_settings(display)
     
     @staticmethod
     def generate_from_dump(filename: str) -> 'Demo':
@@ -243,7 +243,7 @@ class Demo:
         visited_websites: List[str] = [v[1:-1] for v in datas[2].split(': [')[1][:-1].split(', ') if v[1:-1] not in blanks]
         d: Demo = Demo(RunContext.AUTO_DETECT)
         d.browsers = browsers
-        d.ykIDs = d.ui.digest_YubiKey_strings(yk_strings)
+        d.ykIDs = d.OS.digest_YubiKey_strings(yk_strings)
         d.visited_websites = visited_websites
         for RP_string in datas[4:]:
             if RP_string in blanks:
@@ -264,7 +264,7 @@ class Demo:
 
 
 
-def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto_backend: bool):
+def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto_backend: bool, _debug_mode: bool):
     # yk = YubiKey(secret=b'\xad\x1d0\x9d\xaa\xa3\xea\xac\x8axj\x89-h\xabm\xa6-\xa8\xa2\xf8-\x94(\x8b\xed\x9an\x1e\xcb\x1b\xd6')
     # pri, pub = yk._generate_key_pair('Microsoft', 'jdoe@wpi.edu')
     # nonce = os.urandom(8)
@@ -288,6 +288,21 @@ def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto
     # Microsoft_Portal: UserFacingConnection = ui.connect_to_internet(browser, 'login.microsoft.com')
     # Microsoft_Portal.execute(ConnectionAction.CreateNewAccount)
 
+    if _debug_mode and session:
+        print(f'>> {COLOR_CODES.CLIENT_LOG}YUBIKEYS:{COLOR_CODES.RESET}')
+        for YK_name, YK in session.OS.YubiKeys.items():
+            secret = f'{YK}'.split('device_secret=')[1].split('</YubiKey>')[0]
+            print(f' {COLOR_CODES.CLIENT_LOG}     {YK_name}, {secret}{COLOR_CODES.RESET}')
+        from util import Tracker, YubiKey
+        print(f'>> {COLOR_CODES.CLIENT_LOG}RELYING PARTIES:{COLOR_CODES.RESET}')
+        for website in Tracker:
+            print(f' {COLOR_CODES.CLIENT_LOG}     {website.name}{COLOR_CODES.RESET}')
+            for name, account in website.accounts.items():
+                print(f'\t {COLOR_CODES.CLIENT_LOG}          {name}, {account.password_hash}{COLOR_CODES.RESET}')
+                print(f'\t {COLOR_CODES.CLIENT_LOG}          {account.salt}{COLOR_CODES.RESET}')
+                print(f'\t {COLOR_CODES.CLIENT_LOG}          0x{YubiKey.public_key_to_bytes(account.public_key).hex()}{COLOR_CODES.RESET}\n')
+    if _debug_mode:
+        print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: debug flags will be displayed{COLOR_CODES.RESET}')
     if _display_crypto_backend:
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: cryptographic backend will be displayed{COLOR_CODES.RESET}')
 
@@ -306,7 +321,7 @@ def generate_session_from_file(filename: Optional[str]) -> Optional[Demo]:
     
 
 if __name__ == "__main__":
-    args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 2, 3, 4])
+    args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 2, 3, 4, 5])
     filename: Optional[str] = args['--launch-from-save']
-    main(generate_session_from_file(filename), RunContext.AUTO_DETECT, args['-display_crypto_backend'])
+    main(generate_session_from_file(filename), RunContext.AUTO_DETECT, args['-display_crypto_backend'], args['-debug_mode'])
     

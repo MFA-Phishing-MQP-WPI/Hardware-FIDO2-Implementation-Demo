@@ -1,6 +1,4 @@
-import require_colorama
-from colorama import just_fix_windows_console
-just_fix_windows_console()
+import fix_colors
 
 class VOID:
     @staticmethod
@@ -70,6 +68,7 @@ class COLOR_CODES:
     RESET: str = Colors.CLEAR
     OK: str = Colors.GREEN
     CLIENT_LOG: str = Colors.BLUE
+    CLIENT_LOG_HIGHLIGHT: str = Colors.BLUE_REVERSE
     ERROR: str = Colors.RED
     ERROR_HEADER: str = Colors.RED_REVERSE
     WARN: str = Colors.YELLOW_REVERSE

@@ -6,6 +6,7 @@ import os
 import sys
 from arg import Parser
 from display import COLOR_CODES
+from terminal import running_on_shell
 
 class Demo:
     def __init__(self, context: RunContext):
@@ -305,6 +306,9 @@ def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: debug flags will be displayed{COLOR_CODES.RESET}')
     if _display_crypto_backend:
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: cryptographic backend will be displayed{COLOR_CODES.RESET}')
+
+    if _debug_mode:
+        print(f'>> {COLOR_CODES.CLIENT_LOG_HIGHLIGHT}--debug: {COLOR_CODES.RESET}{COLOR_CODES.CLIENT_LOG} running on {running_on_shell()}{COLOR_CODES.RESET}')
 
     if not session:
         if not context:

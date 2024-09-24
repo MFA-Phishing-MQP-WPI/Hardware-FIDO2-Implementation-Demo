@@ -178,6 +178,8 @@ These packages are automatically installed by running the demo if they aren't al
 #### ✔️ Add Browser
 #### ✔️ Add YubiKey
 #### ✔️ Connect to Website
+#### ✔️ Save State
+#### ✔️ Load From Previous State
 ### Website Actions
 #### ✔️ Create New Account
 #### ✔️ Login (1FA)

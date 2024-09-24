@@ -116,13 +116,13 @@ To run the demo:
 ##### ✔️ `Close Connection` / `Go back to the main menu`
 ##### ✔️ `Add a new account`
 ##### ✔️ `Login (1FA)`
-##### ❌ `Login (MFA)`
+##### ✔️ `Login (MFA)`
 
 ### Website Logged-In Actions
 ##### ✔️ `Close Connection` / `Go back to the main menu`
-##### ❌ `Add MFA`
-##### ❌ `Change Password`
-##### ❌ `Update MFA`
+##### ✔️ `Add MFA`
+##### ✔️ `Change Password`
+##### ✔️ `Update MFA`
 ##### ❌ Brainstorm other `secure account actions` like `Send an email`, `view inbox`, and other secure actions
 
 ### Backend Actions

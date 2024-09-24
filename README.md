@@ -44,7 +44,7 @@ These packages are automatically installed by running the demo if they aren't al
 
    ```bash
    git clone https://github.com/MFA-Phishing-MQP-WPI/Hardware-FIDO2-Implementation-Demo.git
-   cd fido2-demo
+   cd Hardware-FIDO2-Implementation-Demo
    ```
 2. **Run the demo:**
 

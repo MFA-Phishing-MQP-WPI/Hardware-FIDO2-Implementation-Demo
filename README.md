@@ -131,10 +131,10 @@ The demo shows the flow of a user logging into a website with 1FA (username and 
 ##### ✔️ `Create new RelyingParty`
 ##### ✔️ `Administer new SessionToken`
 ##### ✔️ `Varify SessionToken Validity`
-* ###### ✔️ `SessionToken For Correct Account`
-* ###### ✔️ `SessionToken Not Expired or Timmed Out`
-* ###### ✔️ `SessionToken Still Active` `(Not Revoked)`
-* ###### ✔️ `SessionToken For Correct Website`
+&nbsp;&nbsp;&nbsp;&nbsp;###### ✔️ `SessionToken For Correct Account`
+&nbsp;&nbsp;&nbsp;&nbsp;###### ✔️ `SessionToken Not Expired or Timmed Out`
+&nbsp;&nbsp;&nbsp;&nbsp;###### ✔️ `SessionToken Still Active` `(Not Revoked)`
+&nbsp;&nbsp;&nbsp;&nbsp;###### ✔️ `SessionToken For Correct Website`
 ##### ✔️ `Create new UserFacingConnection`
 ##### ✔️ `Complete UserFacingConnection Actions`
 ##### ✔️ `Interface with all classes from demo class` classes: [`Browser`, `YubiKey`, `RelyingParty`, `UserInterface`, `Connection`, `UserFacingConnection`, `AccountActions`]

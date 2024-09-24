@@ -1,5 +1,5 @@
 # from util import YubiKey, is_signed, RelyingParty
-from util import UserInterface, RunContext, UserFacingConnection, ConnectionAction, state_saved
+from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, state_saved, cursor
 from typing import Dict, List, Optional
 import time
 import os
@@ -10,7 +10,7 @@ from display import COLOR_CODES
 class Demo:
     def __init__(self, context: RunContext):
         self.browsers: List[str] = []
-        self.ui: UserInterface = UserInterface(context)
+        self.ui: OperatingSystem = OperatingSystem(context)
         self.ykIDs: List[str] = []
         self.connections: Dict[str, UserFacingConnection] = {}
         self.visited_websites: List[str] = []
@@ -97,14 +97,9 @@ class Demo:
     def save_state(self):
         try:
             from util import Tracker
-            print('Collecting data', end='\r')
-            time.sleep(0.29)
-            print('Collecting data.', end='\r')
-            time.sleep(0.17)
-            print('Collecting data..', end='\r')
-            time.sleep(0.51)
-            print('Collecting data...', end='\r')
-            time.sleep(0.17)
+            for i in range(20):
+                print(f'Collecting data {cursor[i%len(cursor)]}', end='\r')
+                time.sleep(0.1)
             RPs: List[str] = [rp.__str__() for rp in Tracker]
             RPs_str = ''
             for rp in RPs:
@@ -224,7 +219,7 @@ class Demo:
         actions = [action.name for action in portal.available_actions(portal.connection.client, portal.connection.website)]
         action_header = f'Welcome to {portal.connection.website.name}! What action would you like to run?'
         if portal.is_logged_in():
-            action_header = f'Hello {portal.connection.session_token.for_account}! What action would you like to run:'
+            action_header = f'Hello {portal.connection.session_token.for_account}@{portal.connection.website.name}! What action would you like to run:'
         return self._choose(
             action_header,
             actions,
@@ -287,7 +282,7 @@ def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto
     # Microsoft.display_table()
 
     # browser = 'Chome.exe'
-    # ui: UserInterface = UserInterface(RunContext.AUTO_DETECT)
+    # ui: OperatingSystem = OperatingSystem(RunContext.AUTO_DETECT)
     # ykID: str = ui.new_YubiKey()
     # ui.boot_client(client_name=browser)
     # Microsoft_Portal: UserFacingConnection = ui.connect_to_internet(browser, 'login.microsoft.com')

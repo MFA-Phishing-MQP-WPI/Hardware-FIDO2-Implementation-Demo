@@ -10,9 +10,8 @@ import hmac
 from hashlib import sha256
 from argon2 import PasswordHasher
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.exceptions import InvalidSignature
 import time
 import datetime
@@ -29,6 +28,7 @@ state_saved: bool = False
 display_backend: bool = True
 console: Colors = Colors(display=True, backend=True)
 WEBSITES: Dict[str, 'RelyingParty'] = {}
+cursor: str = '|/-\\'
 
 
 
@@ -50,22 +50,33 @@ class ConnectionAction(Enum):
 
 Tracker: List['RelyingParty'] = []
 class Hasher:
-    def __init__(self, password: str, salt: Optional[bytes] = None, display: bool = True):
+    def __init__(self, RP_name: str, password: str, salt: Optional[bytes] = None, display: bool = True):
+        self.RP_name = RP_name
         if salt is None:
+            global cursor
+            for i in range(12):
+                Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {cursor[i%len(cursor)]}', end='\r')
+                time.sleep(0.1)
             salt = os.urandom(32)
-            Hasher.print_backend(display, f'No salt provided ... Generating random salt: 0x{salt.hex()}')
-        Hasher.print_backend(display, f'Initializing Hasher object from password="{password}" and salt={salt.hex()}...')
+            Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: 0x{salt.hex()}  ')
+        Hasher.print_backend(self.RP_name, display, f'Initializing Hasher object from password="{password}" and salt={salt.hex()}...')
         self.salt = salt
         self.hashed_password = self._hash_password(password, salt)
 
     def _hash_password(self, password: str, salt: bytes, display=display_backend) -> str:
-        Hasher.print_backend(display, f'Using Argon2 to hash password...')
+        Hasher.print_backend(self.RP_name, display, f'Using Argon2 to hash password...')
         ph = PasswordHasher()
         return ph.hash(password.encode(), salt=salt)
 
-    def hash_str(self, display=display_backend) -> str:
-        Hasher.print_backend(display, f'Generating hash string... (i.e. "[hashed_password]:[salt]")')
-        Hasher.print_backend(display, f'Resulting hash: "{self.hashed_password}"')
+    def hash_str(self, display=display_backend, _force=False) -> str:
+        if _force:
+            return f"{self.hashed_password}:{self.salt.hex()}"
+        global cursor
+        for i in range(12):
+            Hasher.print_backend(self.RP_name, display, f'Generating hash string... {cursor[i%len(cursor)]}', end='\r')
+            time.sleep(0.1)
+        Hasher.print_backend(self.RP_name, display, f'Generating hash string... (i.e. "[hashed_password]:[salt]")')
+        Hasher.print_backend(self.RP_name, display, f'Resulting hash: "{self.hashed_password}"')
         return f"{self.hashed_password}:{self.salt.hex()}"
     
     def __str__(self) -> str:
@@ -79,33 +90,34 @@ class Hasher:
         return self.hashed_password == other.hashed_password and self.salt == other.salt
 
     def is_same_password(self, password: str) -> bool:
-        provided_hasher = Hasher(password, salt=bytes.fromhex(self.salt.hex()))
+        provided_hasher = Hasher(self.RP_name, password, salt=bytes.fromhex(self.salt.hex()))
         return provided_hasher == self
     @staticmethod
-    def is_correct_password(password: str, hash_string: str) -> bool:
-        stored_hasher = Hasher.from_hash_string(hash_string)
-        provided_hasher = Hasher(password, salt=bytes.fromhex(stored_hasher.salt.hex()))
+    def is_correct_password(RP_name: str, password: str, hash_string: str) -> bool:
+        stored_hasher = Hasher.from_hash_string(RP_name, hash_string)
+        provided_hasher = Hasher(RP_name, password, salt=bytes.fromhex(stored_hasher.salt.hex()))
         return provided_hasher == stored_hasher
 
     @staticmethod
-    def from_hash_string(hash_string: str, display=display_backend) -> 'Hasher':
-        Hasher.print_backend(display, f'Creating Hasher object from hash string: {hash_string}')
+    def from_hash_string(RP_name: str, hash_string: str, display=display_backend) -> 'Hasher':
+        Hasher.print_backend(RP_name, display, f'Creating Hasher object from hash string: {hash_string}')
         hashed_password, salt = hash_string.split(':')
         salt = bytes.fromhex(salt)
-        Hasher.print_backend(display, f'Extracted salt: {salt.hex()}')
-        hasher = Hasher("", salt=salt)  
+        Hasher.print_backend(RP_name, display, f'Extracted salt: {salt.hex()}')
+        hasher = Hasher(RP_name, "", salt=salt)  
         hasher.hashed_password = hashed_password  
         return hasher
     @staticmethod
-    def print_backend(display: bool, message: str) -> None:
+    def print_backend(RP_name: str, display: bool, message: str, end='\n') -> None:
         if display:
             print('       ', end='')
-            console.log('RelyingParty').print_backend('       $RP(g).', 'crypto_backend.HashObject:   ', f" {message}")
+            console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.HashObject:   ', f" {message}", end=end)
 
 class YubiKeyResponse:
-    signature: bytes
-    nonce: bytes
-    YubiKeyID: str
+    def __init__(self, signature: bytes, nonce: bytes, YubiKeyID: str):
+        self.signature: bytes = signature
+        self.nonce: bytes = nonce
+        self.YubiKeyID: str = YubiKeyID
 
 class MFARegistrationRequest:
     def __init__(self, RP_ID: str, username: str):
@@ -125,11 +137,50 @@ class YubiKey:
             ID = get_rand_id(12)
         self._device_secret: bytes = secret
         self.ID: str = ID
-        console.log('YubiKey').print(f'   $YK({self.ID}): initializing for the first time...')
+        console.log('YubiKey').print(f'$YK({self.ID}): initializing for the first time...')
         time.sleep(0.1)
     
+    def __str__(self) -> str:
+        return f'<YubiKey>id={self.ID}, device_secret=0x{self._device_secret.hex()}</YubiKey>'
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
     def register_account(self, request: MFARegistrationRequest) -> MFARegistrationApproval:
+        global cursor
+        for i in range(12):
+            console.log('YubiKey').print_backend(
+                f'$YK({self.ID})', 
+                '.crypto_backend.approval :', 
+                f'Calculating private key for RP({request.RP_ID}) + User="{request.username}" {cursor[i%len(cursor)]}',
+                end='\r')
+            time.sleep(0.1)
+        console.log('YubiKey').print_backend(
+            f'$YK({self.ID})', 
+            '.crypto_backend.approval :', 
+            f'Calculating private key for RP({request.RP_ID}) + User="{request.username}"  ')
+        id = {get_rand_id(10)}
+        console.log('YubiKey').print_backend(
+            f'$YK({self.ID})', 
+            '.crypto_backend.approval :', 
+            f'Calculated PrivateKey({id}) for RP({request.RP_ID}) + User="{request.username}"')
+        for i in range(7):
+            console.log('YubiKey').print_backend(
+                f'$YK({self.ID})', 
+                '.crypto_backend.approval :', 
+                f'Calculating public key for PrivateKey({id}) {cursor[i%len(cursor)]}',
+                end='\r')
+            time.sleep(0.1)
         _, public_key = self._generate_key_pair(request.RP_ID, request.username)
+        pubk: str = f'{YubiKey.public_key_to_bytes(public_key).hex()}'[:25]
+        console.log('YubiKey').print_backend(
+            f'$YK({self.ID})', 
+            '.crypto_backend.approval :',
+            f'Calculated PublicKey(0x{pubk}...) for PrivateKey({id})')
+        console.log('YubiKey').print_backend(
+            f'$YK({self.ID})', 
+            '.crypto_backend.approval :',
+            f'Returning PublicKey(0x{pubk}...) to Operating System')
         return MFARegistrationApproval(public_key, self.ID)
 
     def _generate_key_pair(self, rp_id, account_info, print_debug=False):
@@ -156,13 +207,13 @@ class YubiKey:
         display('        5. Derive public key from private key')
 
         # Serialize public key for transmission/storage (compressed point format)
-        public_key_bytes = public_key.public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
+        public_key_bytes = public_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.CompressedPoint)
 
         # display(f"Public Key (Compressed): {public_key_bytes.hex()}")
         # display(f'Private Key {YubiKey._private_key_to_number(private_key)}')
         return (private_key, public_key)
     
-    def auth_2FA(self, challenge: 'Challenge') -> Optional[YubiKeyResponse]:
+    def auth_2FA(self, challenge: 'Challenge') -> YubiKeyResponse:
         private_key, _ = self._generate_key_pair(challenge.RP_ID, challenge.username)
         return self._sign(challenge.nonce, private_key)
     def _sign(self, nonce: bytes, private_key) -> YubiKeyResponse:
@@ -175,6 +226,25 @@ class YubiKey:
         )
         return YubiKeyResponse(signature, nonce, self.ID)
     
+    @staticmethod
+    #   public_key_to_bytes(public_key: ec._EllipticCurvePublicKey) -> bytes:
+    def public_key_to_bytes(public_key                            ) -> bytes:
+        return public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    @staticmethod
+    def bytes_to_public_key(public_key_bytes: bytes): # -> ec._EllipticCurvePublicKey:
+        if not isinstance(public_key_bytes, bytes):
+            raise TypeError("Expected bytes")
+        try:
+            return serialization.load_pem_public_key(
+                public_key_bytes,
+                backend=default_backend()
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to deserialize public key: {e}")
+
     @staticmethod
     def _private_key_to_number(private_key) -> int:
         return private_key.private_numbers().private_value
@@ -195,16 +265,11 @@ class YubiKey:
     
     @staticmethod
     def _gen_secret(print_fun=False) -> bytes:
+        global cursor
+        for i in range(18):
+            console.log('YubiKey').print(f"No secret specified. Generating random secret {cursor[i%len(cursor)]}", end='\r')
         secret = os.urandom(32)
-        console.log('YubiKey').print("No secret specified. Generating random secret", end='\r')
-        time.sleep(0.3)
-        console.log('YubiKey').print("No secret specified. Generating random secret.", end='\r')
-        time.sleep(0.21)
-        console.log('YubiKey').print("No secret specified. Generating random secret..", end='\r')
-        time.sleep(0.28)
-        console.log('YubiKey').print("No secret specified. Generating random secret...", end='\r')
-        time.sleep(0.47)
-        console.log('YubiKey').print(f"No secret specified. Generating random secret   {secret}")
+        console.log('YubiKey').print(f"No secret specified. Generating random secret {secret}")
         return secret
     
 class Account:
@@ -217,23 +282,24 @@ class Account:
         self.public_key = pk
         self.public_key_to_display = pk_id
 
-    def has_same_password(self, password: str) -> bool:
+    def has_same_password(self, RP_name: str, password: str) -> bool:
         return Hasher.is_correct_password(
+            RP_name,
             password, 
             self._hasher_object.hash_str()
         )
 
     def __str__(self) -> str:
-        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key={self.public_key}<br-splitter>public_key_to_display={self.public_key_to_display}</Account>'
+        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=0x{YubiKey.public_key_to_bytes(self.public_key).hex()}<br-splitter>public_key_to_display={self.public_key_to_display}</Account>'
 
     def __repr__(self) -> str:
         return self.__str__()
 
     @staticmethod
-    def from_string(account_string: str) -> 'Account':
+    def from_string(RP_name: str, account_string: str) -> 'Account':
         username_pattern = r"Username=(.*?)<br-splitter>"
         password_pattern = r"Password=(.*?)<br-splitter>"
-        public_key_pattern = r"public_key=(.*?)<br-splitter>"
+        public_key_pattern = r"public_key=0x(.*?)<br-splitter>"
         public_key_to_display_pattern = r"<br-splitter>public_key_to_display=(.*?)</Account>"
 
         # Extract the username, password hash, and public key using regex
@@ -245,7 +311,9 @@ class Account:
         # Get the matches, convert password hash to bytes, handle public key 'None'
         username = username_match.group(1) if username_match else None
         password_hash_str = password_match.group(1) if password_match else None
-        public_key = public_key_match.group(1) if public_key_match else None
+        public_key = YubiKey.bytes_to_public_key(
+            bytes.fromhex(public_key_match.group(1))
+        ) if public_key_match else None
         public_key_to_display = public_key_to_display_match.group(1) if public_key_to_display_match else None
 
 
@@ -259,15 +327,15 @@ class Account:
             print(f'{account_string=}')
             print(f'{password_hash_str=}')
             raise ValueError('Invalid password hash group specified')
-        account: Account = Account(username, Hasher.from_hash_string(password_hash_str), pk=public_key, pk_id=public_key_to_display)
+        account: Account = Account(username, Hasher.from_hash_string(RP_name, password_hash_str), pk=public_key, pk_id=public_key_to_display)
         return account
     @staticmethod
-    def split(s: str) -> List['Account']:
+    def split(RP_name: str, s: str) -> List['Account']:
         l: List[Account] = []
         for account_string in s.split('</Account>'):
             if account_string in ['{}', ' ', '', '\t', ']', '[', '[]']:
                 continue
-            acc: Account = Account.from_string(account_string + '</Account>')
+            acc: Account = Account.from_string(RP_name, account_string + '</Account>')
             l.append(acc)
         return l
 
@@ -280,13 +348,19 @@ class SessionToken:
         self.nonces = {}
         self.active: bool = True
         self.by_connection: Connection = by_connection
+        self.ID = get_rand_id(8)
 
         # hidden
         self._expires_on = int(datetime.datetime.now(datetime.timezone.utc).timestamp()) + hours * 3600
         self._data = data
         self._value_string = f'Account={self.for_account},atype={self.auth_type},expires={self._expires_on},nonce={self._data.hex()}'
         RP: RelyingParty = by_connection.website
-        console.log('RelyingParty').print_backend('       $RP(g).', 'crypto_backend.SessionToken: ', f" Generating SessionToken with auth_type={self.auth_type} for user={account}. Note: this user requires auth_type={auth_type_required}")
+        console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Going to generate SessionToken with auth_type={self.auth_type} for user={account}@{RP.name}. Note: this user requires auth_type={auth_type_required}")
+        global cursor
+        for i in range(12):
+            console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Generating SessionToken {cursor[i%len(cursor)]}", end='\r')
+            time.sleep(0.1)
+        console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Generated SessionToken with auth_type={self.auth_type} for user={account}@{RP.name}")
     
     def __str__(self) -> str:
         return f'<SessionToken>Username={self.for_account},Type={self.auth_type},RequiredType={self.account_requires},Nonces={self.nonces},Active={self.active}</SessionToken>'
@@ -315,19 +389,25 @@ class SessionToken:
 
 
 class Challenge:
-    def __init__(self, RP_ID, username, token_1FA, NonceID, Nonce):
-        self.RP_ID = RP_ID
+    def __init__(self, RP: 'RelyingParty', username: str, token_1FA: 'SessionToken', NonceID: str, Nonce: bytes):
+        self.RP_ID = RP.name
         self.username = username
         self.token_1FA = token_1FA
         self.NonceID = NonceID
         self.nonce = Nonce
+        nonce_cut = f'{Nonce}'[:20] + '...'
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f' Generating challenge ...')
+        time.sleep(0.2)
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'    Challenge(user={username}@{self.RP_ID}, SessionToken({token_1FA.ID}), Nonce(id={NonceID}, bytes_value={nonce_cut})')
+        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f' Signing challenge using RP({self.RP_ID})')
+
 
 class RelyingParty:
     def __init__(self, name: str):
         self.name = name
         self.accounts: Dict[str, Account] = {}
         self._longest_account_length = len('Username')  # used for displaying in table
-        self.tokens = {}
+        self.tokens: Dict[str, SessionToken] = {}
         self.INDENT = "     "
         self.classname = 'RelyingParty'
         self.p(f'initializing for the first time...')
@@ -390,7 +470,7 @@ class RelyingParty:
             self.p(f'Account Information:')
             self.p(f'\tUsername: {acc.name}')
             self.p(f'\tPassword Hash: {acc.password_hash}')
-            self.p(f'\tPassword Salt: {acc.password_salt}')
+            self.p(f'\tPassword Salt: {acc.salt}')
             self.p(f'\tPublic Key: {acc.public_key}')
             return True
         except KeyboardInterrupt as ki:
@@ -439,7 +519,7 @@ class RelyingParty:
             self.p(f'Recieved approval from Client({client.name})')
             self.accounts[session.for_account].public_key = approval.public_key
             self.accounts[session.for_account].public_key_to_display = f'YK({approval.YubiKeyID})'
-            self.p(f'Updated user settings for user="{session.for_account}" to public_key="{approval.public_key}"')
+            self.p(f'Updated user settings for user="{session.for_account}@{self.name}" to public_key="{approval.public_key}"')
             self.show_table_question()
             global state_saved
             state_saved = False
@@ -496,7 +576,7 @@ class RelyingParty:
             if not self.add_account(username, password):
                 return False
             time.sleep(0.1)
-            self.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}){Colors.CLEAR}')
+            self.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}@{self.name}){Colors.CLEAR}')
             self.p(f'Sending message to Client({self.name}): "ACCOUNT {username.upper()} DOES NOT HAVE 2FA CONFIGURED"')
             time.sleep(0.3)
             console.log(self.classname).print(f'{self.INDENT}$RP({self.name})::WARNING ACCOUNT {username.upper()} DOES NOT HAVE 2FA CONFIGURED')
@@ -513,7 +593,7 @@ class RelyingParty:
             self.display_table()
         console.clear()
 
-    def _add_token(self, account, token):
+    def _add_token(self, account: str, token: SessionToken):
         if account not in self.tokens.keys():
             raise ValueError(f"Account '{account}' does not exist.")
         self.tokens[account].append(token)
@@ -526,7 +606,7 @@ class RelyingParty:
             # pHash, salt = Hasher(account_password).hash_str().split(':')
             self.accounts[account_name] = Account(
                 account_name,
-                Hasher(account_password)
+                Hasher(self.name, account_password)
             )
             self._longest_account_length = max(self._longest_account_length, len(account_name))
             return True
@@ -545,15 +625,16 @@ class RelyingParty:
     def display_table(self) -> bool:
         print(f"\nRelying Party '{self.name}' accounts table:")
         dotted_line = '-' * (self._longest_account_length + 2)
-        seper = f'|{dotted_line}|---------------------------------------|-----------------------------|----------------|'
+        seper = f'|{dotted_line}|---------------------------------------|-----------------------------|-------------|------------------------------|'
         print('_' * len(seper))
-        print('| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA Public Key |')
+        print('| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA Secured |        MFA Public Key        |')
         print(seper)
         for account_name, account in self.accounts.items():
             username = account_name.center(self._longest_account_length)
-            public_key = '    Exists    ' if account.public_key else '     None     '
-            hash, salt = account._hasher_object.hash_str(display=False).split(':')
-            print(f'| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {public_key} |')
+            MFA_Secured = '    YES    ' if account.public_key else '    NO     '
+            public_key = f'0x{YubiKey.public_key_to_bytes(account.public_key).hex()}'[:25] + '...' if account.public_key else '            None            '
+            hash, salt = account._hasher_object.hash_str(display=False, _force=True).split(':')
+            print(f'| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {MFA_Secured} | {public_key} |')
         print('‾' * len(seper))
         return True
     def _generate_token(self, account: str, hours: float, auth_type: str, required_auth_type: str, by_connection: 'Connection') -> SessionToken:
@@ -583,12 +664,13 @@ class RelyingParty:
                 (not spec_token or token.is_same(spec_token)): # will only run if spec_token is not None
                 return True
         return False
-    def get_token(self, account:str, auth_type:str, spec_token = None):
+    def get_token(self, account:str, auth_type:str, spec_token: Optional[SessionToken] = None) -> Optional[SessionToken]:
         self.prune_tokens()
         for token in self.tokens[account]:
+            t: SessionToken = token
             # validate token for this user and this action
             if token.is_valid(account, auth_type) and \
-                (not spec_token or token.is_same(spec_token)): # will only run if spec_token is not None
+                (not spec_token or token.is_same(spec_token.value())): # will only run if spec_token is not None
                 return token
         return None
     def valid_login(self, username: str, password: str) -> bool:
@@ -597,7 +679,7 @@ class RelyingParty:
             return False
         console.log(self.classname).print(f'     $RP({self.name}): Hashing password with stored salt to compare against stored hashed password...')
         time.sleep(0.1)
-        response: bool = self.accounts[username].has_same_password(password)
+        response: bool = self.accounts[username].has_same_password(self.name, password)
         if response:
             console.log(self.classname).print(f' --d $RP({self.name}): Password Hash matches! Sending code "HTTP 200" back to Client')
         else:
@@ -627,28 +709,42 @@ class RelyingParty:
             connection: 'Connection'
             ) -> Optional[SessionToken]:
         try:
-            if session.timmed_out:
+            if session.timmed_out():
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'SessionToken(id={session.ID}, type={session.auth_type}) timmed out')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'Cannot grant MFA SessionToken to user with expired SessionToken')
                 return None
             if not session.is_valid(username, '1FA'):
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'SessionToken(id={session.ID}, type={session.auth_type}) is not valid for this user')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'Cannot grant MFA SessionToken without a valid 1FA SessionToken')
                 return None
+            
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'SessionToken(id={session.ID}, type={session.auth_type}) is valid for this user')
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f'Checking YubiKey signature ...')
+            time.sleep(0.2)
             if is_signed(
                 response.nonce,
                 self.accounts[session.for_account].public_key,
-                response.signature
+                response.signature,
+                self.name
             ):
                 return SessionToken(session.for_account, 1, 'MFA', 'MFA', connection)
         except KeyboardInterrupt as ki:
             pass
         return None # failed MFA verification (YubiKey response not valid)
         
-    def request_challenge(self, username: str, token: bytes, ykID: int) -> Challenge:
-        TK = self.get_token(username, '1FA', token)
+    def request_challenge(self, username: str, token: bytes, yk: YubiKey) -> Optional[Challenge]:
+        self.p(f'Locating SessionToken(type=1FA) for user {username} that matches signature {token}')
+        TK: Optional[SessionToken] = self.get_token(username, '1FA', token)
         if not TK:
-            raise ValueError('Permission denied - token not found or expired')
+            self.p('Permission denied - session token not found or expired')
+            return None
+        self.p(f'Located SessionToken({TK.ID}) for user {username} that matches signature {token}')
+        console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.ChallengeGen: ', 'Generating challenge ...')
         nonce = os.urandom(32)
-        console.log(self.classname).print(f'     $RP({self.name}): generating challenge for usr="{username}", YubiKey({ykID})')
+        console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.ChallengeGen: ', f'Generated nonce: {nonce}')
+        console.log(self.classname).print(f'     $RP({self.name}): generating challenge for usr="{username}", YubiKey({yk.ID})')
         return Challenge(
-            self.name,
+            self,
             username,
             token,
             TK.add_nonce(nonce),
@@ -682,24 +778,30 @@ class RelyingParty:
         if not match:
             raise ValueError("String format doesn't match the expected pattern.\nstring=" + s)
         # Constructing the dictionary with the parsed values
+        RP_name: sttr = match.group("name")
         return {
-            "name": match.group("name"),
-            "accounts": Account.split(match.group("accounts")),
+            "name": RP_name,
+            "accounts": Account.split(RP_name, match.group("accounts")),
             "_longest_account_length": int(match.group("_longest_account_length"))
         }
 
 
 class Connection:
-    def __init__(self, client: 'Client', website: RelyingParty, UI_ptr: 'UserInterface'):
+    def __init__(self, client: 'Client', website: RelyingParty, UI_ptr: 'OperatingSystem'):
         self.client: Client = client
         self.website: RelyingParty = website
         self.session_token: Optional[SessionToken] = None
-        self.UI_ptr: UserInterface = UI_ptr
+        self.UI_ptr: OperatingSystem = UI_ptr
 
-    def request_yubikey_insert_from_OS(self) -> Optional[int]:
-        return self.UI_ptr.insert_yubikey()
+    def request_yubikey_insert_from_OS(self, username: str) -> Optional[int]:
+        c_name: str = self.client.name
+        rp_name: str = self.website.name
+        console.log('Client').print(f'   $Client({c_name}): Got request from RP({rp_name}) for username: {username} to enter YubiKey to request Challenge.')
+        console.log('Client').print(f'   $Client({c_name}): Passing request to Operating System on behalf of RP({rp_name})...')
+        time.sleep(0.2)
+        return self.UI_ptr.insert_yubikey(self, username)
 
-    def request_yubikey_auth_from_OS(self, ykID, challenge) -> bytes:
+    def request_yubikey_auth_from_OS(self, ykID: int, challenge: Challenge) -> YubiKeyResponse:
             return self.UI_ptr.YubiKey_auth(ykID, challenge)
     def login(self) -> bool:
         token: SessionToken = self.client._login_user(self)
@@ -721,7 +823,7 @@ class Client:
         console.log('Client').print(f'   $Client({self.name}): initializing for the first time...')
         time.sleep(0.25)
 
-    def request_registration(self, request: MFARegistrationRequest, talking_to: RelyingParty, operating_system: 'UserInterface') -> Optional[MFARegistrationApproval]:
+    def request_registration(self, request: MFARegistrationRequest, talking_to: RelyingParty, operating_system: 'OperatingSystem') -> Optional[MFARegistrationApproval]:
         console.log('Client').print(f'   $Client({self.name}): Recieved request for MFA registration for account="{request.username}"')
         if request.RP_ID != talking_to.name:
             console.log('Client').err(f'   $Client({self.name}): ERR: Requested registration for account="{request.username}" by unexpected RP "{request.RP_ID}" DOES NOT MATCH RP ID provided in request.')
@@ -757,6 +859,8 @@ class Client:
         if action == ConnectionAction.Login:
             return not not self._login_user(connection)
 
+
+
     def _login_user(self, connection: Connection) -> Optional[SessionToken]:
         try:
             global WEBSITES
@@ -785,33 +889,68 @@ class Client:
                 break
             console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): Username and password hash match...')
             if RP.requires_2FA(username):
-                console.log(RP.classname).print(f'     $RP({RP.name}): usr="{username}" requires 2FA...')
-                console.log(RP.classname).print(f'     $RP({RP.name}): insert and auth using YubiKey for the respective account.')
-                ykID: Optional[int] = connection.request_yubikey_insert_from_OS()
-                if not ykID:
-                    console.log(RP.classname).print(f'     $RP({RP.name}): usr="{username}" timmed out')
+                console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}" requires 2FA...')
+                console.log(RP.classname).print(f'     $RP({RP.name}): Sending request to client for user to insert and auth using YubiKey for the respective account...')
+                time.sleep(0.1)
+                YK: Optional[YubiKey] = connection.request_yubikey_insert_from_OS(username)
+                if not YK:
+                    time.sleep(1.2)
+                    console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}" timmed out')
                     console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                     return None
-                challenge: Challenge = RP.request_challenge(username, session_token, ykID) # will print generating challenge
+                challenge: Optional[Challenge] = RP.request_challenge(username, session_token, YK) # will print generating challenge
+                if not challenge:
+                    console.log('Client').print(f'   $Client({self.name}): Waiting ...')
+                    time.sleep(1.5)
+                    console.log('Client').print(f'   $Client({self.name}): Request for "challenge request" timemed out')
+                    time.sleep(1.2)
+                    console.log(RP.classname).print(f'     $RP({RP.name}): Request for "challenge request" from usr="{username}" timmed out')
+                    console.log(RP.classname).print(f'     $RP({RP.name}): Sending "{username}" back to main menu')
+                    return None
+                console.log('Client').print(f'   $Client({self.name}): Recieved challenge from RP({RP.name})')
+                console.log('Client').print(f'   $Client({self.name}): Verifying source of challenge . . .')
+                self.print_backend(f' Comunicating with: RP({RP.name})')
+                self.print_backend(f' Challenge signed by RP({challenge.RP_ID})')
                 if challenge.RP_ID != RP.name:
+                    self.print_backend(f' RP({RP.name}) != RP({challenge.RP_ID})')
+                    self.print_backend(f' THROW Exceptions.CryptographicBackend.UnknownRelyingParty')
                     console.log('Client').print(f'   $Client({self.name}): failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
                     space = ' ' * len(f'   $Client({self.name}): ')
                     console.log('Client').print(f'{space}... ignoring challenge')
                     console.log(RP.classname).print(f'     $RP({RP.name}): usr="{username}" timmed out')
                     console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                     return None
-                console.log('Client').print(f'   $Client({self.name}): verified challenge sender as ({RP.name}). Challenge originating ID matches communicating sub-domain.')
+                self.print_backend(f' RP({RP.name}) == RP({challenge.RP_ID})')
+                console.log('Client').print(f'   $Client({self.name}): Successfully verified challenge sender as RP({RP.name}). Challenge originating ID matches communicating sub-domain.')
                 space = ' ' * len(f'   $Client({self.name}): ')
-                console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication')
-                response: Optional[bytes] = connection.request_yubikey_auth_from_OS(ykID, challenge)
-                if not response:
-                    console.log('Client').print(f'RESPONSE FAILED?????????')
-                session_token: SessionToken = RP.grant_session_token_MFA(username, session_token, response, connection)
+                global cursor
+                for i in range(14):
+                    console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication {cursor[i%len(cursor)]}', end='\r')
+                    time.sleep(0.1)
+                console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication  ')
+                console.log('YubiKey').print_backend(
+                    f'$YK({YK.ID})',  
+                    '.crypto_backend.authentic:', 
+                    f'Recieved Challenge from Operating System on behalf of Client on behalf of RP.')
+                console.log('YubiKey').print_backend(
+                    f'$YK({YK.ID})',  
+                    '.crypto_backend.authentic:', 
+                    f'Waiting for User to press YubiKey button to authenitcate')
+                console.log('OperatingSystem').post()
+                if input(f" $OperatingSystem: Press the YubiKey to authenticate? (Y/n) > {Colors.CLEAR}").lower() not in ['y', 'yes']:
+                    console.log('OperatingSystem').print(f' $OperatingSystem: Letting challenge time out...')
+                    time.sleep(0.8)
+                    console.log('Client').print(f'   $Client({self.name}): Challenge timmed out...')
+                    console.log(RP.classname).print(f'     $RP({RP.name}): Challenge timmed out...')
+                    return None
+                response: YubiKeyResponse = connection.request_yubikey_auth_from_OS(YK.ID, challenge)
+                session_token: Optional[SessionToken] = RP.grant_session_token_MFA(username, session_token, response, connection)
                 if not session_token:
-                    console.log('Client').print(f'  $Client({self.name}): SIGN IN FAILED!!!!!!!!')
-                console.log('Client').print(f"  $Client({self.name}): SIGN IN SUCCESS!!!!!!!!")
+                    console.log('Client').print(f'  $Client({self.name}): Recieved "HTML 403" as a response from RP({RP.name})')
+                    return None
+                console.log('Client').print(f"  $Client({self.name}): MFA login successful!")
             else:
-                RP.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}){Colors.CLEAR}')
+                RP.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}@{RP.name}){Colors.CLEAR}')
                 console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username} does not have 2FA configured -> skipping 2FA')
             console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username} Access Granted!')
         except KeyboardInterrupt as ki:
@@ -819,6 +958,9 @@ class Client:
         console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): Passing SessionToken({get_rand_id(18)}) to Client')
         return session_token
 
+    def print_backend(self, message: str) -> None:
+        print('       ', end='')
+        console.log('Client').print_backend(f'     Client({self.name}).', 'crypto_backend.WebAuthn:     ', f" {message}")
 
 def get_rand_id(length: int) -> str:
     return ''.join(random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=length))
@@ -828,19 +970,39 @@ def hash(inp:str)->bytes:
     sha256_instance.update(inp.encode('utf8'))
     return sha256_instance.digest()
 
-def is_signed(nonce: bytes, public_key, response: bytes) -> bool:
+def is_signed(nonce: bytes, public_key, response: bytes, RP_name: str = '') -> bool:
     """
     Verifies that the given response is a valid signature for the nonce, using the public key.
     """
     try:
+        console.log('RelyingParty').print_backend(
+            f'       $RP({RP_name}).', 
+            'crypto_backend.AsymetricDecr:', 
+            f'Trying to decrypt response="0x{response.hex()}" using public key on file {public_key}'
+        )
         # Verify the signature using the public key
         public_key.verify(
             response,
             nonce,
             ec.ECDSA(hashes.SHA256())  # Using ECDSA with SHA-256
         )
+        console.log('RelyingParty').print_backend(
+            f'       $RP({RP_name}).', 
+            'crypto_backend.SessionToken: ', 
+            f'Decrypted response successfully'
+        )
+        console.log('RelyingParty').print_backend(
+            f'       $RP({RP_name}).', 
+            'crypto_backend.SessionToken: ', 
+            f'Decrypted response is equal to nonce that was originally sent to the user'
+        )
         return True
     except InvalidSignature:
+        console.log('RelyingParty').print_backend(
+            f'       $RP({RP_name}).', 
+            'crypto_backend.SessionToken: ', 
+            f'Decryption failed'
+        )
         return False
     
 
@@ -915,13 +1077,13 @@ class UserFacingConnection:
         if self.is_logged_in():
             console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
             time.sleep(0.1)
-            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for logged in user={self.connection.session_token.for_account}")
+            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for ConnectionType=\"logged in user={self.connection.session_token.for_account}@{self.connection.website.name}\"")
             time.sleep(0.1)
             console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
         else:
             console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
             time.sleep(0.1)
-            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for no user")
+            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for ConnectionType=\"no user\"")
             time.sleep(0.1)
             console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
             
@@ -943,44 +1105,46 @@ class UserFacingConnection:
     def is_logged_in(self) -> bool:
         return self.connection.is_logged_in()
 
-class UserInterface:
+class OperatingSystem:
     def __init__ (self, run_context: RunContext):
         self.console: Colors = Colors(display=(run_context == 1))
         self.clients: Dict[str, Client] = {}
         self.YubiKeys = {}
 
     def approve_mfa_registration_request(self, request: MFARegistrationRequest, by_client: Client) -> Optional[MFARegistrationApproval]:
-        console.log('UserInterface').print(f" $UserInterface: Recieved mfa registration request from Client({by_client.name}) on behalf of RP({request.RP_ID}).")
+        console.log('OperatingSystem').print(f" $OperatingSystem: Recieved mfa registration request from Client({by_client.name}) on behalf of RP({request.RP_ID}).")
         if len(self.YubiKeys) == 0:
-            console.log('UserInterface').print(f" $UserInterface: No YubiKeys registered on this device. You do not have the ability approve this request.")
-            console.log('UserInterface').print(f" $UserInterface: Registration request timmed out.")
+            console.log('OperatingSystem').print(f" $OperatingSystem: No YubiKeys registered on this device. You do not have the ability approve this request.")
+            console.log('OperatingSystem').print(f" $OperatingSystem: Registration request timmed out.")
             return None
-        console.log('UserInterface').print(f" $UserInterface: Here are a list of your YubiKeys:")
-        base_buff: str = ' ' * len(' $UserInterface:')
+        console.log('OperatingSystem').print(f" $OperatingSystem: Here are a list of your YubiKeys:")
+        base_buff: str = ' ' * len(' $OperatingSystem:')
         for i, yk in enumerate(self.YubiKeys.keys()):
-            console.log('UserInterface').print(f"{base_buff}\t {i + 1}. '{yk}'")
-        console.log('UserInterface').print(f"{base_buff}\t {i + 2}. deny registration request")
-        console.log('UserInterface').post()
-        inp = input(f" $UserInterface: Please select a YubiKey to approve (or {i + 2} to deny) > {Colors.CLEAR}")
+            console.log('OperatingSystem').print(f"{base_buff}\t {i + 1}. '{yk}'")
+        console.log('OperatingSystem').print(f"{base_buff}\t {i + 2}. deny registration request")
+        console.log('OperatingSystem').post()
+        inp = input(f" $OperatingSystem: Please select a YubiKey to approve (or {i + 2} to deny) > {Colors.CLEAR}")
         yk_name: Optional[str] = None
         try:
             ichoice = int(inp)
             yk_name = (list(self.YubiKeys.keys()) + ['deny registration request'])[ichoice - 1]
         except ValueError:
             for yk in list(self.YubiKeys.keys()) + ['deny registration request']:
-                if yk.startswith(inp):
+                if yk.lower().startswith(inp.lower()):
                     yk_name = yk
                     break
         if not yk_name:
-            console.log('UserInterface').print(f" $UserInterface: Invalid choice '{inp}'. Registration request timmed out.")
+            console.log('OperatingSystem').print(f" $OperatingSystem: Invalid choice '{inp}'. Registration request timmed out.")
             return None
         if yk_name == 'deny registration request':
-            console.log('UserInterface').print(f" $UserInterface: Registration request denied.")
+            console.log('OperatingSystem').print(f" $OperatingSystem: Registration request denied.")
             return None
         yk: YubiKey = self.YubiKeys[yk_name]
         approval: MFARegistrationApproval = yk.register_account(request)
-        console.log('UserInterface').print(f" $UserInterface: Reclieved approved registration request from YubiKey({yk.ID}) for RP({request.RP_ID}) on behalf of user {request.username}.")
-        console.log('UserInterface').print(f" $UserInterface: Passing approval to Client({by_client.name}).")
+        console.log('OperatingSystem').print(f" $OperatingSystem: Received approved registration request from YubiKey({yk.ID}) for RP({request.RP_ID}) on behalf of user {request.username}...")
+        space: str = ' ' * len(' $OperatingSystem: ')
+        console.log('OperatingSystem').print(f"{space}... in the form the YubiKey({approval.YubiKeyID})'s public key (for this account): {approval.public_key}")
+        console.log('OperatingSystem').print(f" $OperatingSystem: Passing approval to Client({by_client.name}).")
         return approval
 
 
@@ -1005,21 +1169,21 @@ class UserInterface:
     def set_YubiKeys(self, YubiKeys: List[YubiKey]) -> None:
         for yk in YubiKeys:
             self.YubiKeys[yk.ID] = yk
-            console.log('UserInterface').print(f" $UserInterface: setting YubiKey({yk.ID}) and restoring old secret ...")
+            console.log('OperatingSystem').print(f" $OperatingSystem: setting YubiKey({yk.ID}) and restoring old secret ...")
 
     def boot_client(self, client_name='Chome.exe') -> Client:
         if client_name not in self.clients.keys():
-            console.log('UserInterface').print(f' $UserInterface: creating new client "{client_name}"')
+            console.log('OperatingSystem').print(f' $OperatingSystem: creating new client "{client_name}"')
             self.clients[client_name] = Client(client_name)
             global state_saved
             state_saved = False
         else:
-            console.log('UserInterface').print(f' $UserInterface: client "{client_name}" already exists, restarting client...')
+            console.log('OperatingSystem').print(f' $OperatingSystem: client "{client_name}" already exists, restarting client...')
         return self.clients[client_name]
 
     def _get_connection(self, client_name, website):
         if client_name not in self.clients.keys():
-            console.log('UserInterface').print(f' $UserInterface: creating new client "{client_name}"')
+            console.log('OperatingSystem').print(f' $OperatingSystem: creating new client "{client_name}"')
             self.clients[client_name] = Client(client_name)
             global state_saved
             state_saved = False
@@ -1027,7 +1191,7 @@ class UserInterface:
         return client.connect(website, self)
 
     def connect_to_internet(self, client_name, website):
-        console.log('UserInterface').print(f' $UserInterface: requesting Client({client_name}) to connect to {website}')
+        console.log('OperatingSystem').print(f' $OperatingSystem: requesting Client({client_name}) to connect to {website}')
         return UserFacingConnection(self._get_connection(client_name, website))
 
     def update_backend_settings(self, display: bool):
@@ -1053,7 +1217,7 @@ class UserInterface:
     def login(self, web_name) -> bool:
         RP = self.get_website(web_name)
         if RP.number_of_accounts == 0:
-            print(f'UserInterface ERR: No accounts found for "{web_name}". Create an account first.')
+            print(f'OperatingSystem ERR: No accounts found for "{web_name}". Create an account first.')
             return False
         while True:
             username = input(f' ${RP.name}: Enter username > ')
@@ -1061,7 +1225,7 @@ class UserInterface:
             b_token: Optional[bytes] = RP.grant_session_token_1FA(username, password)
             if not b_token: 
                 self.console.log(f' ${RP.name}: Username or Password incorrect. Access denied. (1FA Fail)')
-                if input(f'UserInterface: Try again? (Y/n) > ').lower() in ['y', 'yes']:
+                if input(f'OperatingSystem: Try again? (Y/n) > ').lower() in ['y', 'yes']:
                     continue
                 return False
             break
@@ -1069,36 +1233,61 @@ class UserInterface:
             self.console.log(f' ${RP.name}: usr="{username}" requires 2FA...')
             self.console.log(f' ${RP.name}: insert and auth using YubiKey for the respective account.')
             if len(self.YubiKeys.keys()) == 0:
-                print(f'UserInterface ERR: No YubiKeys found. Add one first.')
+                print(f'OperatingSystem ERR: No YubiKeys found. Add one first.')
                 return False
             while True:
-                resp = input(f'UserInterface: Enter YubiKey ID or enter "-SHOW YUBIKEY IDs" to view all known YubiKey IDs > ')
+                resp = input(f'OperatingSystem: Enter YubiKey ID or enter "-SHOW YUBIKEY IDs" to view all known YubiKey IDs > ')
                 
         print(f'$ {RP.name}: Successfully logged in as "{username}". Access granted')
     """
-    def insert_yubikey(self) -> Optional[int]:
+    def insert_yubikey(self, connection: Connection, account: str) -> Optional[YubiKey]:
+        console.log('OperatingSystem').print(f' $OperatingSystem: Client({connection.client.name}) is requesting YubiKey authentication for account="{account}" on behalf of RP({connection.website.name})')
+        console.log('OperatingSystem').post()
+        undesided: bool = True
+        while undesided:
+            resp = input(f' $OperatingSystem: Insert YubiKey or Deny Login Request (Y/n) > {Colors.CLEAR}')
+            if 'Insert YubiKey'.lower().startswith(resp.lower()) or 'Deny Login Request'.lower().startswith(resp.lower()) or resp.lower() in ['y', 'yes', 'n', 'no']:
+                undesided = False
+        if 'Denny Login Request'.lower().startswith(resp.lower()) or resp.lower() in ['n', 'no']:
+            return None
         while True:
-            resp = input(f'UserInterface: Enter YubiKey ID or enter "-SHOW YUBIKEY IDs" to view all known YubiKey IDs > {Colors.CLEAR}')
-            if resp.lower() == '-show yubikey ids':
-                console.log('UserInterface').print('UserInterface: YubiKey IDs:')
-                for id, YK in self.YubiKeys.items():
-                    console.log('UserInterface').print(f'  {id}: {YK}')
-                continue
+            console.log('OperatingSystem').print(' $OperatingSystem: YubiKey IDs:')
+            for i, id in enumerate(list(self.YubiKeys.keys())):
+                console.log('OperatingSystem').print(f'  {i + 1}: {id}')
+            selectedYubiKey: Optional[YubiKey] = None
+            selectedYubiKeyName: Optional[str] = None
             try:
-                id = int(resp)
-                if id in self.YubiKeys.keys():
-                    console.log('UserInterface').print(f'UserInterface: YubiKey({id}) inserted into computer...')
-                    return id
+                console.log('OperatingSystem').post()
+                resp = input(f' $OperatingSystem: Select YubiKey to insert > {Colors.CLEAR}')
+                index = int(resp)
+                if index > 0 and index <= len(self.YubiKeys.keys()):
+                    selectedYubiKeyName: str = list(self.YubiKeys.keys())[index - 1]
+                    selectedYubiKey = self.YubiKeys[selectedYubiKeyName]
+                    self.print_spinning_cursor(selectedYubiKeyName)
+                    console.log('OperatingSystem').print(f' $OperatingSystem: YubiKey({selectedYubiKeyName}) inserted into computer...')
+                    return selectedYubiKey
             except ValueError:
-                console.log('UserInterface').post()
-                if input(f'UserInterface: No such key ("{id}"), try again (Y/n)? {Colors.CLEAR}').lower() in ['y', 'yes']:
+                for yk_name in self.YubiKeys.keys():
+                    if yk_name.lower().startswith(resp.lower()):
+                        selectedYubiKeyName = yk_name
+                        selectedYubiKey = self.YubiKeys[selectedYubiKeyName]
+                        self.print_spinning_cursor(selectedYubiKeyName)
+                        console.log('OperatingSystem').print(f' $OperatingSystem: YubiKey({selectedYubiKeyName}) inserted into computer...')
+                        return selectedYubiKey
+                console.log('OperatingSystem').post()
+                if input(f' $OperatingSystem: "{resp}" out of bounds and no such key starts with ("{resp}"), try again (Y/n)? {Colors.CLEAR}').lower() in ['y', 'yes']:
                     console.clear()
                     continue
                 console.clear()
-                console.log('UserInterface').print(f"UserInterface: You didn't enter a YubiKey in time!")
+                console.log('OperatingSystem').print(f" $OperatingSystem: You didn't enter a YubiKey in time!")
                 return None
+    def print_spinning_cursor(self, selectedYubiKeyName: str):
+        global cursor
+        for i in range(18):
+            console.log('OperatingSystem').print(f' $OperatingSystem: Inserting YubiKey({selectedYubiKeyName}) {cursor[i%len(cursor)]}', end='\r')
+            time.sleep(0.15)
     # will always return bytes, may be wrong but will always return bytes (never None)
-    def YubiKey_auth(self, ykID: int, challenge: Challenge) -> Optional[YubiKeyResponse]:
+    def YubiKey_auth(self, ykID: int, challenge: Challenge) -> YubiKeyResponse:
         YK: YubiKey = self.YubiKeys[ykID]
         return YK.auth_2FA(challenge)
     

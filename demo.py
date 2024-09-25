@@ -1,5 +1,5 @@
 # from util import YubiKey, is_signed, RelyingParty
-from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, state_saved, cursor
+from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, state_saved, cursor, edit_classes_pre_intialization
 from typing import Dict, List, Optional
 import time
 import os
@@ -265,7 +265,12 @@ class Demo:
 
 
 
-def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto_backend: bool, _debug_mode: bool):
+def main(
+        session: Optional[Demo], 
+        context: Optional[RunContext], 
+        _display_crypto_backend: bool, 
+        _debug_mode: bool, 
+        _debug_challenge: bool):
     # yk = YubiKey(secret=b'\xad\x1d0\x9d\xaa\xa3\xea\xac\x8axj\x89-h\xabm\xa6-\xa8\xa2\xf8-\x94(\x8b\xed\x9an\x1e\xcb\x1b\xd6')
     # pri, pub = yk._generate_key_pair('Microsoft', 'jdoe@wpi.edu')
     # nonce = os.urandom(8)
@@ -306,7 +311,10 @@ def main(session: Optional[Demo], context: Optional[RunContext], _display_crypto
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: debug flags will be displayed{COLOR_CODES.RESET}')
     if _display_crypto_backend:
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: cryptographic backend will be displayed{COLOR_CODES.RESET}')
-
+    if _debug_challenge:
+        print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: you will be able to edit the values of the challenge before it is created{COLOR_CODES.RESET}')
+        global edit_classes_pre_intialization
+        edit_classes_pre_intialization['Challenge'] = True
     if _debug_mode:
         print(f'>> {COLOR_CODES.CLIENT_LOG_HIGHLIGHT}--debug: {COLOR_CODES.RESET}{COLOR_CODES.CLIENT_LOG} running on {running_on_shell()}{COLOR_CODES.RESET}')
 
@@ -325,7 +333,7 @@ def generate_session_from_file(filename: Optional[str]) -> Optional[Demo]:
     
 
 if __name__ == "__main__":
-    args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 2, 3, 4, 5])
+    args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 2, 3, 4, 5, 6])
     filename: Optional[str] = args['--launch-from-save']
-    main(generate_session_from_file(filename), RunContext.AUTO_DETECT, args['-display_crypto_backend'], args['-debug_mode'])
+    main(generate_session_from_file(filename), RunContext.AUTO_DETECT, args['-display_crypto_backend'], args['-debug_mode'], args['-debug_challenge'])
     

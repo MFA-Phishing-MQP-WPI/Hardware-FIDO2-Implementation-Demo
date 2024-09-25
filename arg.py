@@ -8,14 +8,16 @@ run_conditions: Dict[str, any] = {
     "--launch-from-save": None,
     "-display_crypto_backend": False,
     '-help': False,
-    '-debug_mode': False
+    '-debug_mode': False,
+    '-debug_challenge': False
 }
 
 help_runers: Tuple[Dict[str, str], Dict[str, Tuple[str, str]]] = (
     {
         '-help': 'prints this help message',
         '-display_crypto_backend': 'displays actions completd by the cryptographic backend',
-        '-debug_mode': 'prints the value of all private keys at runtime start'
+        '-debug_mode': 'prints the value of all private keys at runtime start',
+        '-debug_challenge': 'lets user edit the values that create the challenge before it is sent to YubiKey for authentication'
     },
     {
         '--launch-from-save [.dump file]': 

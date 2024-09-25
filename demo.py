@@ -1,11 +1,11 @@
 # from util import YubiKey, is_signed, RelyingParty
-from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, state_saved, cursor, edit_classes_pre_intialization
+from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, Client, state_saved, cursor, edit_classes_pre_intialization, debug_mode, reinstating
 from typing import Dict, List, Optional
 import time
 import os
 import sys
 from arg import Parser
-from display import COLOR_CODES
+from display import COLOR_CODES, Colors
 from terminal import running_on_shell
 
 class Demo:
@@ -25,7 +25,7 @@ class Demo:
         print('')
 
     def _webselect(self):
-        if len(self.visited_websites) == 0:
+        if len(self.visited_websites) == 0 and len(self.connections) == 0:
             return None
         return self._choose(
             'Where would you like to go?',
@@ -179,11 +179,12 @@ class Demo:
                 self.browsers,
                 '  Enter the number of your choice > '
             )
-            self.OS.boot_client(client_name=browser)
+            client: Client = self.OS.boot_client(client_name=browser)
             website_name: str = self._webselect()
             if not website_name or website_name == 'new website':
                 website_name = input("Where would you like to connect to: ")
             Portal: UserFacingConnection = self.OS.connect_to_internet(browser, website_name)
+            self.connections[f'{client.name}.connect({website_name})'] = Portal
             if website_name not in self.visited_websites: self.visited_websites.append(website_name)
             print('Established connection successfully!')
             ALL_CONECTIONACTIONS: List[ConnectionAction] = [
@@ -196,9 +197,13 @@ class Demo:
                 ConnectionAction.Show_Account_Tables,
                 ConnectionAction.View_Account_Info
             ]
+            global reinstating
+            reinstating = False
             while True:
                 action: str = self.get_action_from_portal(Portal)
                 if action == ConnectionAction.Close_Connection.name:
+                    if f'{client.name}.connect({website_name})' in self.connections.keys():
+                        del self.connections[f'{client.name}.connect({website_name})']
                     break
                 for possible_action in ALL_CONECTIONACTIONS:
                     if action == possible_action.name:
@@ -250,8 +255,9 @@ class Demo:
             if RP_string in blanks:
                 continue
             RelyingParty.from_string(RP_string)
-        if input('Continue? (Y/n) > ').lower() in ['y', 'yes']:
-            print('\n'*25)
+        
+        if input(f'{Colors.CLEAR}{Colors.CYAN}Continue? (Y/n) > {Colors.MAGENTA}').lower() in ['y', 'yes']:
+            print(Colors.CLEAR + '\n'*25)
             global state_saved
             state_saved = True
             return d
@@ -273,6 +279,8 @@ def main(
         _display_crypto_backend: bool, 
         _debug_mode: bool, 
         _debug_challenge: bool):
+    global debug_mode
+    debug_mode = _debug_mode
     # yk = YubiKey(secret=b'\xad\x1d0\x9d\xaa\xa3\xea\xac\x8axj\x89-h\xabm\xa6-\xa8\xa2\xf8-\x94(\x8b\xed\x9an\x1e\xcb\x1b\xd6')
     # pri, pub = yk._generate_key_pair('Microsoft', 'jdoe@wpi.edu')
     # nonce = os.urandom(8)
@@ -295,7 +303,6 @@ def main(
     # ui.boot_client(client_name=browser)
     # Microsoft_Portal: UserFacingConnection = ui.connect_to_internet(browser, 'login.microsoft.com')
     # Microsoft_Portal.execute(ConnectionAction.CreateNewAccount)
-
     if _debug_mode and session:
         print(f'>> {COLOR_CODES.CLIENT_LOG}YUBIKEYS:{COLOR_CODES.RESET}')
         for YK_name, YK in session.OS.YubiKeys.items():
@@ -335,7 +342,10 @@ def main(
 def generate_session_from_file(filename: Optional[str]) -> Optional[Demo]:
     if not filename:
         return None
-    return Demo.generate_from_dump(filename)
+    global reinstating
+    reinstating = True
+    d = Demo.generate_from_dump(filename)
+    return d
     
 
 if __name__ == "__main__":

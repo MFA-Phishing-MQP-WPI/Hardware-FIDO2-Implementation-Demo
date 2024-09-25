@@ -304,9 +304,12 @@ def main(
         for website in Tracker:
             print(f' {COLOR_CODES.CLIENT_LOG}     {website.name}{COLOR_CODES.RESET}')
             for name, account in website.accounts.items():
-                print(f'\t {COLOR_CODES.CLIENT_LOG}          {name}, {account.password_hash}{COLOR_CODES.RESET}')
-                print(f'\t {COLOR_CODES.CLIENT_LOG}          {account.salt}{COLOR_CODES.RESET}')
-                print(f'\t {COLOR_CODES.CLIENT_LOG}          0x{YubiKey.public_key_to_bytes(account.public_key).hex()}{COLOR_CODES.RESET}\n')
+                yks = 'account.public_key=None'
+                if account.public_key:
+                    yks = f'account.public_key=0x{YubiKey.public_key_to_bytes(account.public_key).hex()}'
+                print(f'\t {COLOR_CODES.CLIENT_LOG}      {name}, {account.password_hash}{COLOR_CODES.RESET}')
+                print(f'\t {COLOR_CODES.CLIENT_LOG}      {account.salt}{COLOR_CODES.RESET}')
+                print(f'\t {COLOR_CODES.CLIENT_LOG}      {yks}{COLOR_CODES.RESET}\n')
     if _debug_mode:
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: debug flags will be displayed{COLOR_CODES.RESET}')
     if _display_crypto_backend:

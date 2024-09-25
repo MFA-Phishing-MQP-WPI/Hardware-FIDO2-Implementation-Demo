@@ -301,7 +301,9 @@ class Account:
         )
 
     def __str__(self) -> str:
-        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=0x{YubiKey.public_key_to_bytes(self.public_key).hex()}<br-splitter>public_key_to_display={self.public_key_to_display}</Account>'
+        if self.public_key:
+            return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=0x{YubiKey.public_key_to_bytes(self.public_key).hex()}<br-splitter>public_key_to_display={self.public_key_to_display}</Account>'
+        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=None<br-splitter>public_key_to_display=None</Account>'
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -1181,7 +1183,7 @@ class OperatingSystem:
     def approve_mfa_registration_request(self, request: MFARegistrationRequest, by_client: Client) -> Optional[MFARegistrationApproval]:
         console.log('OperatingSystem').print(f" $OperatingSystem: Recieved mfa registration request from Client({by_client.name}) on behalf of RP({request.RP_ID}).")
         if len(self.YubiKeys) == 0:
-            console.log('OperatingSystem').print(f" $OperatingSystem: No YubiKeys registered on this device. You do not have the ability approve this request.")
+            console.log('OperatingSystem').print(f" $OperatingSystem: {Colors.CLEAR}{Colors.RED_REVERSE}No YubiKeys registered on this device.{Colors.CLEAR}{Colors.RED} You do not have the ability approve this request.")
             console.log('OperatingSystem').print(f" $OperatingSystem: Registration request timmed out.")
             return None
         console.log('OperatingSystem').print(f" $OperatingSystem: Here are a list of your YubiKeys:")

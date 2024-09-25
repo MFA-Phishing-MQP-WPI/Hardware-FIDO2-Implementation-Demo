@@ -141,14 +141,17 @@ class MFARegistrationApproval:
         self.YubiKeyID: str = YubiKeyID
 
 class YubiKey:
-    def __init__(self, secret:Optional[bytes]=None, ID:Optional[str]=None):
+    def __init__(self, secret:Optional[bytes]=None, ID:Optional[str]=None, _first_time=True):
         if not secret:
             secret = YubiKey._gen_secret(print_fun=True)
         if not ID:
             ID = get_rand_id(12)
         self._device_secret: bytes = secret
         self.ID: str = ID
-        console.log('YubiKey').print(f'$YK({self.ID}): initializing for the first time...')
+        msg = 'Initializing for the first time...'
+        if not _first_time:
+            msg = 'Reloading ...'
+        console.log('YubiKey').print(f'$YK({self.ID}): {msg}')
         time.sleep(0.1)
     
     def __str__(self) -> str:
@@ -262,15 +265,16 @@ class YubiKey:
     
     @staticmethod
     def from_string(s: str) -> 'YubiKey':
-        id_pattern = r"<YubiKey>([A-Za-z0-9]+),"
-        secret_pattern = r", b'(.*?)'"
-        secret_backup_pattern = r', b"(.*?)"'
+        id_pattern = r"<YubiKey>id=([A-Za-z0-9]+), "
+        secret_pattern = r" device_secret=0x(.*?)</YubiKey>"
+        # secret_backup_pattern = r', b"(.*?)"'
         id_match = re.search(id_pattern, s)
         secret_match = re.search(secret_pattern, s)
-        secret_backup_match = re.search(secret_backup_pattern, s)
+        # secret_backup_match = re.search(secret_backup_pattern, s)
         yk_id = id_match.group(1) if id_match else None
-        device_secret_str = eval(f"b'{secret_match.group(1)}'") if secret_match else eval(f'b"{secret_backup_match.group(1)}"') if secret_backup_match else None
-        yk = YubiKey(secret=device_secret_str, ID=yk_id)
+        # device_secret_str = eval(f"b'{secret_match.group(1)}'") if secret_match else eval(f'b"{secret_backup_match.group(1)}"') if secret_backup_match else None
+        device_secret: bytes = bytes.fromhex(secret_match.group(1)) if secret_match else None
+        yk = YubiKey(secret=device_secret, ID=yk_id, _first_time=False)
         return yk
     
     
@@ -312,7 +316,7 @@ class Account:
     def from_string(RP_name: str, account_string: str) -> 'Account':
         username_pattern = r"Username=(.*?)<br-splitter>"
         password_pattern = r"Password=(.*?)<br-splitter>"
-        public_key_pattern = r"public_key=0x(.*?)<br-splitter>"
+        public_key_pattern = r"public_key=(.*?)<br-splitter>"
         public_key_to_display_pattern = r"<br-splitter>public_key_to_display=(.*?)</Account>"
 
         # Extract the username, password hash, and public key using regex
@@ -325,7 +329,7 @@ class Account:
         username = username_match.group(1) if username_match else None
         password_hash_str = password_match.group(1) if password_match else None
         public_key = YubiKey.bytes_to_public_key(
-            bytes.fromhex(public_key_match.group(1))
+            bytes.fromhex(public_key_match.group(1)[2:])
         ) if public_key_match else None
         public_key_to_display = public_key_to_display_match.group(1) if public_key_to_display_match else None
 
@@ -522,10 +526,11 @@ class RelyingParty:
         try:
             acc: Account = self.accounts[session.for_account]
             self.p(f'Account Information:')
-            self.p(f'\tUsername: {acc.name}')
-            self.p(f'\tPassword Hash: {acc.password_hash}')
+            self.p(f'\tUsername:      {acc.name}')
+            self.p(f'\tPassword Hash: {bytes_to_base64(acc.password_hash.encode("utf8"))}')
             self.p(f'\tPassword Salt: {acc.salt}')
-            self.p(f'\tPublic Key: {acc.public_key}')
+            pub = f'{YubiKey.public_key_to_bytes(acc.public_key)}'.replace("-----BEGIN PUBLIC KEY-----\n", "").replace("\n-----END PUBLIC KEY-----\n", "")
+            self.p(f'\tPublic Key:    {pub}')
             return True
         except KeyboardInterrupt as ki:
             return False
@@ -1364,8 +1369,7 @@ class OperatingSystem:
     def YKs_to_string(self):
         result: List[str] = []
         for _, yk in self.YubiKeys.items():
-            result.append(f'<YubiKey>{yk.ID}, {yk._device_secret}</YubiKey>')
-            print(f'{yk._device_secret}')
+            result.append(f'{yk}')
         return result
     
         

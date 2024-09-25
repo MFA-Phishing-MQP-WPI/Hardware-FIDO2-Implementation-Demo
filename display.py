@@ -23,6 +23,8 @@ class Colors:
     YELLOW = "\033[93m"
     BLUE = "\033[94m"
     BOLD = "\033[1m"
+    CYAN = "\033[96m"
+    MAGENTA = "\033[95m"
     DARK_YELLOW_BOLD = '\033[33m33'
     
     # Grey highlight versions
@@ -30,12 +32,16 @@ class Colors:
     RED_GREY_HIGHLIGHT = "\033[100;1;31m"
     YELLOW_GREY_HIGHLIGHT = "\033[100;93m"
     BLUE_GREY_HIGHLIGHT = "\033[100;94m"
+    CYAN_GREY_HIGHLIGHT = "\033[100;96m"
+    MAGENTA_GREY_HIGHLIGHT = "\033[100;95m"
 
     # Reverse colors (color highlight with white text)
     GREEN_REVERSE = "\033[42;97m"
     RED_REVERSE = "\033[41;97m"
     YELLOW_REVERSE = "\033[43;97m"
-    BLUE_REVERSE = "\033[44;97m"
+    BLUE_REVERSE = "\033[104;97m"  # "\033[44;97m"
+    CYAN_REVERSE = "\033[46;97m"
+    MAGENTA_REVERSE = "\033[45;97m"
 
     def __init__(self, display=False, backend=True):
         self.display = display
@@ -44,7 +50,8 @@ class Colors:
             'Client': BLUE,
             'RelyingParty': GREEN,
             'YubiKey': YELLOW,
-            'YubiKey Factory' : DARK_YELLOW_BOLD
+            'YubiKey Factory' : DARK_YELLOW_BOLD,
+            'Challenge': CYAN
         }
         if not backend:
             global backend_display
@@ -61,6 +68,10 @@ class Colors:
     def set_backend_display(self, display: bool):
         global backend_display
         backend_display = print if display else VOID.print
+    
+    @staticmethod
+    def clear_display():
+        print(f'{Colors.CLEAR}', end='')
 
 
 
@@ -165,3 +176,35 @@ class BLUE:
     @staticmethod
     def err(s: str):
         print(f'{Colors.BLUE_REVERSE}{s}{Colors.CLEAR}')
+class CYAN:
+    @staticmethod
+    def post():
+        print(Colors.CYAN, end='')
+    @staticmethod
+    def print(*args, **kwargs):
+        print(Colors.CYAN, end='\r')
+        print(*args, **kwargs)
+        print(Colors.CLEAR, end='\r')
+    @staticmethod
+    def print_backend(prefix: str, header: str, s: str, end='\n'):
+        global backend_display
+        backend_display(f'\r{Colors.CYAN}{prefix}{Colors.CYAN_GREY_HIGHLIGHT}{header}{Colors.CLEAR}{Colors.CYAN}{s}{Colors.CLEAR}', end=end)
+    @staticmethod
+    def err(s: str):
+        print(f'{Colors.CYAN_REVERSE}{s}{Colors.CLEAR}')
+class MAGENTA:
+    @staticmethod
+    def post():
+        print(Colors.MAGENTA, end='')
+    @staticmethod
+    def print(*args, **kwargs):
+        print(Colors.MAGENTA, end='\r')
+        print(*args, **kwargs)
+        print(Colors.CLEAR, end='\r')
+    @staticmethod
+    def print_backend(prefix: str, header: str, s: str, end='\n'):
+        global backend_display
+        backend_display(f'\r{Colors.MAGENTA}{prefix}{Colors.MAGENTA_GREY_HIGHLIGHT}{header}{Colors.CLEAR}{Colors.MAGENTA}{s}{Colors.CLEAR}', end=end)
+    @staticmethod
+    def err(s: str):
+        print(f'{Colors.MAGENTA_REVERSE}{s}{Colors.CLEAR}')

@@ -29,6 +29,17 @@ display_backend: bool = True
 console: Colors = Colors(display=True, backend=True)
 WEBSITES: Dict[str, 'RelyingParty'] = {}
 cursor: str = '|/-\\'
+edit_classes_pre_intialization: Dict[str, bool] = {
+    'RelyingParty': False,
+    'Account': False,
+    'SessionToken': False,
+    'YubiKeyResponse': False,
+    'MFARegistrationRequest': False,
+    'MFARegistrationApproval': False,
+    'YubiKey': False,
+    'Challenge': False,
+    'YubiKeyResponse': False
+}
 
 
 
@@ -58,8 +69,8 @@ class Hasher:
                 Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {cursor[i%len(cursor)]}', end='\r')
                 time.sleep(0.1)
             salt = os.urandom(32)
-            Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: 0x{salt.hex()}  ')
-        Hasher.print_backend(self.RP_name, display, f'Initializing Hasher object from password="{password}" and salt={salt.hex()}...')
+            Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {bytes_to_base64(salt)}  ')
+        Hasher.print_backend(self.RP_name, display, f'Initializing Hasher object from password="{password}" and salt={bytes_to_base64(salt)}...')
         self.salt = salt
         self.hashed_password = self._hash_password(password, salt)
 
@@ -103,7 +114,7 @@ class Hasher:
         Hasher.print_backend(RP_name, display, f'Creating Hasher object from hash string: {hash_string}')
         hashed_password, salt = hash_string.split(':')
         salt = bytes.fromhex(salt)
-        Hasher.print_backend(RP_name, display, f'Extracted salt: {salt.hex()}')
+        Hasher.print_backend(RP_name, display, f'Extracted salt: {bytes_to_base64(salt)}')
         hasher = Hasher(RP_name, "", salt=salt)  
         hasher.hashed_password = hashed_password  
         return hasher
@@ -172,15 +183,15 @@ class YubiKey:
                 end='\r')
             time.sleep(0.1)
         _, public_key = self._generate_key_pair(request.RP_ID, request.username)
-        pubk: str = f'{YubiKey.public_key_to_bytes(public_key).hex()}'[:25]
+        pubk: str = f'{bytes_to_base64(YubiKey.public_key_to_bytes(public_key))}'
         console.log('YubiKey').print_backend(
             f'$YK({self.ID})', 
             '.crypto_backend.approval :',
-            f'Calculated PublicKey(0x{pubk}...) for PrivateKey({id})')
+            f'Calculated PublicKey({pubk}) for PrivateKey({id})')
         console.log('YubiKey').print_backend(
             f'$YK({self.ID})', 
             '.crypto_backend.approval :',
-            f'Returning PublicKey(0x{pubk}...) to Operating System')
+            f'Returning PublicKey({pubk}) to Operating System')
         return MFARegistrationApproval(public_key, self.ID)
 
     def _generate_key_pair(self, rp_id, account_info, print_debug=False):
@@ -390,21 +401,57 @@ class SessionToken:
 
 class Challenge:
     def __init__(self, RP: 'RelyingParty', username: str, token_1FA: 'SessionToken', NonceID: str, Nonce: bytes):
-        self.RP_ID = RP.name
+        RP_name = RP.name
+        global edit_classes_pre_intialization
+        global cursor
+        if edit_classes_pre_intialization['Challenge']:
+            try:
+                question: str = f'         --dbuger Challenge.__init__(RP_name="{RP.name}", username="{username}", nonce="{bytes_to_base64(Nonce)}") override? (Y/n) > {Colors.MAGENTA}'
+                Colors.clear_display()
+                console.log('Challenge').post()
+                if input(question).lower() in ['y', 'yes']:
+                    console.log('Challenge').post()
+                    RP_name = input(f'         --dbuger Challenge.__init__(RP_name={Colors.MAGENTA}')
+                    Colors.clear_display()
+                    console.log('Challenge').post()
+                    username = input(f'         --dbuger Challenge.__init__(RP_name="{RP_name}", username={Colors.MAGENTA}')
+                    Colors.clear_display()
+                    console.log('Challenge').post()
+                    resp = input(f'         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce={Colors.MAGENTA}')
+                    Colors.clear_display()
+                    Nonce = base64_to_bytes(resp)
+                    console.log('Challenge').print(f'         --OVERRIDE::Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}")')
+                    Colors.clear_display()
+                    for i in range(8):
+                        console.log('Challenge').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation {cursor[i%len(cursor)]}', end='\r')
+                        time.sleep(0.1)
+                    console.log('Challenge').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation - success')
+            except KeyboardInterrupt:
+                Colors.clear_display()
+                return
+            except Exception as e:
+                Colors.clear_display()  
+                raise Exception
+
+
+        self.RP_ID = RP_name
         self.username = username
         self.token_1FA = token_1FA
         self.NonceID = NonceID
         self.nonce = Nonce
         nonce_cut = f'{Nonce}'[:20] + '...'
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f' Generating challenge ...')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f' Generating challenge ...')
         time.sleep(0.2)
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'     Challenge(')
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         user={username}@{self.RP_ID}, ')
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         SessionToken({token_1FA.ID}),')
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         Nonce(id={NonceID},')
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'         bytes_value={nonce_cut}')
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f'     )')
-        console.log('RelyingParty').print_backend(f'       $RP({self.RP_ID}).', 'crypto_backend.ChallengeGen: ', f' Signing challenge using RP({self.RP_ID})')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'     Challenge(')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         user={username}@{RP_name}, ')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         SessionToken({token_1FA.ID}),')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         Nonce(id={NonceID},')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         bytes_value={nonce_cut}')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'     )')
+        for i in range(16):
+            console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f' Signing challenge using RP({RP_name}) {cursor[i%len(cursor)]}', end='\r')
+            time.sleep(0.1)
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f' Signing challenge using RP({RP_name}) - success')
 
 
 class RelyingParty:
@@ -524,7 +571,7 @@ class RelyingParty:
             self.p(f'Recieved approval from Client({client.name})')
             self.accounts[session.for_account].public_key = approval.public_key
             self.accounts[session.for_account].public_key_to_display = f'YK({approval.YubiKeyID})'
-            self.p(f'Updated user settings for user="{session.for_account}@{self.name}" to public_key="0x{YubiKey.public_key_to_bytes(approval.public_key).hex()}"')
+            self.p(f'Updated user settings for user="{session.for_account}@{self.name}" to public_key="{bytes_to_base64(YubiKey.public_key_to_bytes(approval.public_key))}"')
             self.show_table_question()
             global state_saved
             state_saved = False
@@ -820,9 +867,11 @@ class Connection:
         token: SessionToken = self.client._login_user(self)
         if token:
             self.session_token = token
-            console.log('Client').print(f'   $Client({self.client.name}): successfully logged in as "{self.session_token.for_account}"')
+            console.log('Client').print(f'   $Client({self.client.name}): Successfully logged in as "{self.session_token.for_account}"')
+            time.sleep(0.2)
             return True
-        console.log('Client').print(f'   $Client({self.client.name}): failed to login')
+        console.log('Client').print(f'   $Client({self.client.name}): Failed to login')
+        time.sleep(0.2)
         return False
     
     def is_logged_in(self) -> bool:
@@ -927,7 +976,8 @@ class Client:
                 if challenge.RP_ID != RP.name:
                     self.print_backend(f'RP({RP.name}) != RP({challenge.RP_ID})')
                     self.print_backend(f'THROW Exceptions.CryptographicBackend.UnknownRelyingParty')
-                    console.log('Client').print(f'   $Client({self.name}): failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
+                    console.log('Client').print(f'   $Client({self.name}): {Colors.CLEAR}{Colors.BLUE_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.BLUE} Exceptions.CryptographicBackend.UnknownRelyingParty')
+                    console.log('Client').print(f'   $Client({self.name}): Failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
                     space = ' ' * len(f'   $Client({self.name}): ')
                     console.log('Client').print(f'{space}... ignoring challenge')
                     console.log(RP.classname).print(f'     $RP({RP.name}): usr="{username}" timmed out')
@@ -1064,7 +1114,11 @@ __KNOWN_WEBSITES__: Dict[str, str] = {
 }
 
 def bytes_to_base64(value: bytes) -> str:
-    return base64.urlsafe_b64encode(value)
+    return base64.urlsafe_b64encode(value).decode('utf-8')
+
+def base64_to_bytes(base64_string: str) -> bytes:
+    return base64.urlsafe_b64decode(base64_string)
+
 
 class UserFacingConnection:
     def __init__(self, connection: Connection):
@@ -1096,7 +1150,7 @@ class UserFacingConnection:
         else:
             console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
             time.sleep(0.1)
-            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for ConnectionType=\"no user\"")
+            console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for ConnectionType=\"not logged in\"")
             time.sleep(0.1)
             console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
             
@@ -1265,8 +1319,9 @@ class OperatingSystem:
             return None
         while True:
             console.log('OperatingSystem').print(' $OperatingSystem: YubiKey IDs:')
+            space = ' ' * len(' $OperatingSystem:')
             for i, id in enumerate(list(self.YubiKeys.keys())):
-                console.log('OperatingSystem').print(f'  {i + 1}: {id}')
+                console.log('OperatingSystem').print(f'{space} {i + 1}. {id}')
             selectedYubiKey: Optional[YubiKey] = None
             selectedYubiKeyName: Optional[str] = None
             try:

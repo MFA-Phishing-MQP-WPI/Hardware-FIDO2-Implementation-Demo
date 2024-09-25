@@ -252,6 +252,8 @@ class Demo:
             RelyingParty.from_string(RP_string)
         if input('Continue? (Y/n) > ').lower() in ['y', 'yes']:
             print('\n'*25)
+            global state_saved
+            state_saved = True
             return d
         exit(1)
     
@@ -306,7 +308,8 @@ def main(
             for name, account in website.accounts.items():
                 yks = 'account.public_key=None'
                 if account.public_key:
-                    yks = f'account.public_key=0x{YubiKey.public_key_to_bytes(account.public_key).hex()}'
+                    pub = f'{YubiKey.public_key_to_bytes(account.public_key)}'
+                    yks = f'account.public_key={pub}'
                 print(f'\t {COLOR_CODES.CLIENT_LOG}      {name}, {account.password_hash}{COLOR_CODES.RESET}')
                 print(f'\t {COLOR_CODES.CLIENT_LOG}      {account.salt}{COLOR_CODES.RESET}')
                 print(f'\t {COLOR_CODES.CLIENT_LOG}      {yks}{COLOR_CODES.RESET}\n')

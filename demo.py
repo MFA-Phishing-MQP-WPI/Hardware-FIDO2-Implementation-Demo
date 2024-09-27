@@ -251,16 +251,21 @@ class Demo:
         d.browsers = browsers
         d.ykIDs = d.OS.digest_YubiKey_strings(yk_strings)
         d.visited_websites = visited_websites
+        rps_tmp: List[RelyingParty] = []
         for RP_string in datas[4:]:
             if RP_string in blanks:
                 continue
-            RelyingParty.from_string(RP_string)
+            rps_tmp.append(RelyingParty.from_string(RP_string))
+        print(f"\n>> Restored {len(rps_tmp)} Relying Parties...")
+        for rp in rps_tmp:
+            rp.display_table(offset='\t')
         
-        if input(f'{Colors.CLEAR}{Colors.CYAN}Continue? (Y/n) > {Colors.MAGENTA}').lower() in ['y', 'yes']:
+        if input(f'{Colors.CLEAR}>> {Colors.CYAN}Continue? (Y/n) > {Colors.MAGENTA}').lower() in ['y', 'yes']:
             print(Colors.CLEAR + '\n'*25)
             global state_saved
             state_saved = True
             return d
+        print(Colors.CLEAR)
         exit(1)
     
     @staticmethod

@@ -62,21 +62,22 @@ class ConnectionAction(Enum):
 
 Tracker: List['RelyingParty'] = []
 class Hasher:
-    def __init__(self, RP_name: str, password: str, salt: Optional[bytes] = None, display: bool = True):
+    def __init__(self, RP_name: str, password: str, salt: Optional[bytes] = None, display: bool = True, RP_Forwarding:Optional[str]=None):
         self.RP_name = RP_name
+        self.RP_pretending_to_be: Optional[str] = f'{RP_Forwarding} -> ' if RP_Forwarding else None
         if salt is None:
             global cursor
             for i in range(12):
-                Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {cursor[i%len(cursor)]}', end='\r')
+                Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {cursor[i%len(cursor)]}', end='\r', f=self.RP_pretending_to_be)
                 if not reinstating:time.sleep(0.1)
             salt = os.urandom(32)
-            Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {bytes_to_base64(salt)}  ')
-        Hasher.print_backend(self.RP_name, display, f'Initializing Hasher object from password="{password}" and salt={bytes_to_base64(salt)}...')
+            Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {bytes_to_base64(salt)}  ', f=self.RP_pretending_to_be)
+        Hasher.print_backend(self.RP_name, display, f'Initializing Hasher object from password="{password}" and salt={bytes_to_base64(salt)}...', f=self.RP_pretending_to_be)
         self.salt = salt
         self.hashed_password = self._hash_password(password, salt)
 
     def _hash_password(self, password: str, salt: bytes, display=display_backend) -> str:
-        Hasher.print_backend(self.RP_name, display, f'Using Argon2 to hash password...')
+        Hasher.print_backend(self.RP_name, display, f'Using Argon2 to hash password...', f=self.RP_pretending_to_be)
         ph = PasswordHasher()
         return ph.hash(password.encode(), salt=salt)
 
@@ -86,10 +87,10 @@ class Hasher:
         global cursor
         global reinstating
         for i in range(12):
-            Hasher.print_backend(self.RP_name, display, f'Generating hash string... {cursor[i%len(cursor)]}', end='\r')
+            Hasher.print_backend(self.RP_name, display, f'Generating hash string... {cursor[i%len(cursor)]}', end='\r', f=self.RP_pretending_to_be)
             if not reinstating: time.sleep(0.1)
-        Hasher.print_backend(self.RP_name, display, f'Generating hash string... (i.e. "[hashed_password]:[salt]")')
-        Hasher.print_backend(self.RP_name, display, f'Resulting hash: "{self.hashed_password}"')
+        Hasher.print_backend(self.RP_name, display, f'Generating hash string... (i.e. "[hashed_password]:[salt]")', f=self.RP_pretending_to_be)
+        Hasher.print_backend(self.RP_name, display, f'Resulting hash: "{self.hashed_password}"', f=self.RP_pretending_to_be)
         return f"{self.hashed_password}:{self.salt.hex()}"
     
     def __str__(self) -> str:
@@ -106,25 +107,26 @@ class Hasher:
         provided_hasher = Hasher(self.RP_name, password, salt=bytes.fromhex(self.salt.hex()))
         return provided_hasher == self
     @staticmethod
-    def is_correct_password(RP_name: str, password: str, hash_string: str) -> bool:
-        stored_hasher = Hasher.from_hash_string(RP_name, hash_string)
+    def is_correct_password(RP_name: str, password: str, hash_string: str, f:Optional[str]=None) -> bool:
+        stored_hasher = Hasher.from_hash_string(RP_name, hash_string, f=f)
         provided_hasher = Hasher(RP_name, password, salt=bytes.fromhex(stored_hasher.salt.hex()))
         return provided_hasher == stored_hasher
 
     @staticmethod
-    def from_hash_string(RP_name: str, hash_string: str, display=display_backend) -> 'Hasher':
-        Hasher.print_backend(RP_name, display, f'Creating Hasher object from hash string: {hash_string}')
+    def from_hash_string(RP_name: str, hash_string: str, display=display_backend, f:Optional[str]=None) -> 'Hasher':
+        Hasher.print_backend(RP_name, display, f'Creating Hasher object from hash string: {hash_string}', f=f)
         hashed_password, salt = hash_string.split(':')
         salt = bytes.fromhex(salt)
-        Hasher.print_backend(RP_name, display, f'Extracted salt: {bytes_to_base64(salt)}')
+        Hasher.print_backend(RP_name, display, f'Extracted salt: {bytes_to_base64(salt)}', f=f)
         hasher = Hasher(RP_name, "", salt=salt)  
         hasher.hashed_password = hashed_password  
         return hasher
     @staticmethod
-    def print_backend(RP_name: str, display: bool, message: str, end='\n') -> None:
-        if display:
+    def print_backend(RP_name: str, display: bool, message: str, end='\n', f:Optional[str]=None) -> None:
+        if display:#      'crypto_backend.HashObject:'
+            crypto_type = f.ljust(29) if f else 'crypto_backend.HashObject:   '
             print('       ', end='')
-            console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.HashObject:   ', f" {message}", end=end)
+            console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', f'{crypto_type}', f" {message}", end=end)
 
 class YubiKeyResponse:
     def __init__(self, signature: bytes, nonce: bytes, YubiKeyID: str):
@@ -301,11 +303,12 @@ class Account:
         self.public_key = pk
         self.public_key_to_display = pk_id
 
-    def has_same_password(self, RP_name: str, password: str) -> bool:
+    def has_same_password(self, RP_name: str, password: str, f:Optional[str]=None) -> bool:
         return Hasher.is_correct_password(
             RP_name,
             password, 
-            self._hasher_object.hash_str()
+            self._hasher_object.hash_str(),
+            f=f
         )
 
     def __str__(self) -> str:
@@ -416,13 +419,13 @@ class SessionToken:
 
 class Challenge:
     def __init__(self, RP: 'RelyingParty', username: str, token_1FA: 'SessionToken', NonceID: str, Nonce: bytes):
-        RP_name = RP.name
+        RP_name = RP.name if RP.name == RP._pretending_to_be else RP._pretending_to_be
         global reinstating
         global edit_classes_pre_intialization
         global cursor
         if edit_classes_pre_intialization['Challenge']:
             try:
-                question: str = f'         --dbuger Challenge.__init__(RP_name="{RP.name}", username="{username}", nonce="{bytes_to_base64(Nonce)}") override? (Y/n) > {Colors.MAGENTA}'
+                question: str = f'         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}") override? (Y/n) > {Colors.MAGENTA}'
                 Colors.clear_display()
                 console.log('Challenge').post()
                 if input(question).lower() in ['y', 'yes']:
@@ -472,8 +475,9 @@ class Challenge:
 
 
 class RelyingParty:
-    def __init__(self, name: str):
+    def __init__(self, name: str, _pretending_to_be: Optional[str] = None):
         self.name = name
+        self._pretending_to_be = self.name if not _pretending_to_be else _pretending_to_be
         self.accounts: Dict[str, Account] = {}
         self._longest_account_length = len('Username')  # used for displaying in table
         self.tokens: Dict[str, SessionToken] = {}
@@ -489,7 +493,7 @@ class RelyingParty:
         accounts: List[Account] = []
         for a_name in self.accounts.keys():
             accounts.append(self.accounts[a_name])
-        return f'RelyingParty({self.name})=||STARTER||{accounts}||SEPER||{self._longest_account_length}||ENDER||'
+        return f'RelyingParty({self.name}||SEPER||_pretending_to_be={self._pretending_to_be})=||STARTER||{accounts}||SEPER||{self._longest_account_length}||ENDER||'
 
     def p(self, *args, **kwargs):
         s = ''
@@ -696,20 +700,23 @@ class RelyingParty:
         global state_saved
         state_saved = False
         self.accounts[account_name].public_key = public_key
-    def display_table(self) -> bool:
-        print(f"\nRelying Party '{self.name}' accounts table:")
+    def display_table(self, offset:str='') -> bool:
+        pretending: str = ''
+        if self.name != self._pretending_to_be:
+            pretending = f' (pretending to be {self._pretending_to_be})'
+        print(f"\n{offset}Relying Party '{self.name}'{pretending} accounts table:")
         dotted_line = '-' * (self._longest_account_length + 2)
         seper = f'|{dotted_line}|---------------------------------------|-----------------------------|-------------|------------------------------|'
-        print('_' * len(seper))
-        print('| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA Secured |        MFA Public Key        |')
-        print(seper)
+        print(offset + '_' * len(seper))
+        print(f'{offset}| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA Secured |        MFA Public Key        |')
+        print(offset + seper)
         for account_name, account in self.accounts.items():
             username = account_name.center(self._longest_account_length)
             MFA_Secured = '    YES    ' if account.public_key else '    NO     '
             public_key = f'0x{YubiKey.public_key_to_bytes(account.public_key).hex()}'[:25] + '...' if account.public_key else '            None            '
             hash, salt = account._hasher_object.hash_str(display=False, _force=True).split(':')
-            print(f'| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {MFA_Secured} | {public_key} |')
-        print('‾' * len(seper))
+            print(f'{offset}| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {MFA_Secured} | {public_key} |')
+        print(offset + '‾' * len(seper))
         return True
     def _generate_token(self, account: str, hours: float, auth_type: str, required_auth_type: str, by_connection: 'Connection') -> SessionToken:
         new_token = SessionToken(
@@ -747,23 +754,28 @@ class RelyingParty:
                 (not spec_token or token.is_same(spec_token.value())): # will only run if spec_token is not None
                 return token
         return None
-    def valid_login(self, username: str, password: str) -> bool:
+    def valid_login(self, username: str, password: str, f:Optional[str]=None) -> bool:
+        forwarding: str = f if f else ''
+        if f:
+            pretending_to_be = f[f.index('Forwarding ') + 11 : f.index(' data to ')]
+        replace_crypto: Optional[str] = f'{pretending_to_be} -> ' if f else None
         if username not in self.accounts.keys():
-            console.log(self.classname).print(f' --d $RP({self.name}): Username could not be found! Sending code "HTTP 403" back to Client')
+            console.log(self.classname).print(f' --d $RP({self.name}):{forwarding} Username could not be found! Sending code "HTTP 403" back to Client')
             return False
-        console.log(self.classname).print(f'     $RP({self.name}): Hashing password with stored salt to compare against stored hashed password...')
+        console.log(self.classname).print(f'     $RP({self.name}):{forwarding} Hashing password with stored salt to compare against stored hashed password...')
         if not reinstating: time.sleep(0.1)
-        response: bool = self.accounts[username].has_same_password(self.name, password)
+        response: bool = self.accounts[username].has_same_password(self.name, password, f=replace_crypto)
         if response:
-            console.log(self.classname).print(f' --d $RP({self.name}): Password Hash matches! Sending code "HTTP 200" back to Client')
+            console.log(self.classname).print(f' --d $RP({self.name}):{forwarding} Password Hash matches! Sending code "HTTP 200" back to Client')
         else:
-            console.log(self.classname).print(f' --d $RP({self.name}): Password Hash does not match! Sending code "HTTP 403" back to Client')
+            console.log(self.classname).print(f' --d $RP({self.name}):{forwarding} Password Hash does not match! Sending code "HTTP 403" back to Client')
         if not reinstating: time.sleep(0.1)
         return response
-    def grant_session_token_1FA(self, username: str, password: str, by_connection: 'Connection') -> Optional[SessionToken]:
-        console.log(self.classname).print(f'     $RP({self.name}): Recieved Tuple(Username, Password) from Client({self.name})')
+    def grant_session_token_1FA(self, username: str, password: str, by_connection: 'Connection', f:Optional[str]=None) -> Optional[SessionToken]:
+        forwarding: str = f if f else ''
+        console.log(self.classname).print(f'     $RP({self.name}):{forwarding} Recieved Tuple(Username, Password) from Client({self.name})')
         if not reinstating: time.sleep(0.1)
-        if self.valid_login(username, password):
+        if self.valid_login(username, password, f=f):
             # grant user token for 1FA
             # it will time out in 3 minutes (0.05 hours) unless user authenticates with 2FA
             # post-2FA: new token will be granted to user (1 hour exp) assuming this token is still valid
@@ -840,29 +852,32 @@ class RelyingParty:
     @staticmethod
     def from_string(relying_party_string: str) -> 'RelyingParty':
         rp_dict: dict = RelyingParty.extract(relying_party_string)
-        rp = RelyingParty(rp_dict['name'])
+        rp = RelyingParty(rp_dict['name'], _pretending_to_be=rp_dict['_pretending_to_be'])
         accounts: List[Account] = rp_dict['accounts']
         for account in accounts:
             rp.accounts[account.name] = account
             rp.tokens[account.name] = []
             # print(f'Added account({account.name}) to RP({rp.name})')
         rp._longest_account_length = rp_dict['_longest_account_length']
-        rp.display_table()
+        # rp.display_table()
         global WEBSITES
         WEBSITES[rp.name] = rp
+        return rp
         
         
 
     @staticmethod
     def extract(s: str) -> dict:
-        pattern = r'RelyingParty\((?P<name>.*?)\)=\|\|STARTER\|\|(?P<accounts>.*?)\|\|SEPER\|\|(?P<_longest_account_length>\d+)\|\|ENDER\|\|'
+        pattern = r'RelyingParty\((?P<name>.*?)\|\|SEPER\|\|_pretending_to_be=(?P<ptb>.*?)\)=\|\|STARTER\|\|(?P<accounts>.*?)\|\|SEPER\|\|(?P<_longest_account_length>\d+)\|\|ENDER\|\|'
         match = re.search(pattern, s)
         if not match:
             raise ValueError("String format doesn't match the expected pattern.\nstring=" + s)
         # Constructing the dictionary with the parsed values
-        RP_name: sttr = match.group("name")
+        RP_name: str = match.group("name")
+        RP_pretending_to_be: str = match.group("ptb")
         return {
             "name": RP_name,
+            '_pretending_to_be': RP_pretending_to_be,
             "accounts": Account.split(RP_name, match.group("accounts")),
             "_longest_account_length": int(match.group("_longest_account_length"))
         }
@@ -968,36 +983,37 @@ class Client:
             global WEBSITES
             web_name = connection.website.name
             RP = WEBSITES[web_name]
+            forwarding: str = '' if RP.name == RP._pretending_to_be else f' Forwarding {RP._pretending_to_be} data to {self.name}:'
             if RP.number_of_accounts() == 0:
                 console.log('Client').err(f'   $Client({self.name})::ERR: No accounts found for "{web_name}". Create an account first.')
                 return None
             while True:
                 console.log('Client').print(f'   $Client({self.name}): Sending login request to RP({RP.name})')
-                console.log(RP.classname).print(f'     $RP({RP.name}): Requesting Tuple(Username, Password) from Client({self.name})')
+                console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Requesting Tuple(Username, Password) from Client({self.name})')
                 console.log('Client').post()
                 username = input(f'   $Client({self.name}): Enter username > {Colors.CLEAR}')
                 console.log('Client').print(f'   $Client({self.name}): Enter password > {Colors.CLEAR}', end='')
                 password = getpass.getpass(prompt='')
                 secure_password = '*' * len(password)
                 console.log('Client').print(f'   $Client({self.name}): Passing Tuple({username, secure_password}) to RP({RP.name})')
-                session_token: Optional[SessionToken] = RP.grant_session_token_1FA(username, password, connection)
+                session_token: Optional[SessionToken] = RP.grant_session_token_1FA(username, password, connection, f=forwarding)
                 if not session_token: 
-                    console.log(RP.classname).print(f'     $RP({RP.name}): Username or Password incorrect. Access denied. (1FA Fail)')
+                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Username or Password incorrect. Access denied. (1FA Fail)')
                     console.log('Client').print(f'   $Client({self.name}): Recieved "HTTP 403" (Access denied) from RP({RP.name})')
                     console.log('Client').post()
                     if input(f'   $Client({self.name}): Try again? (Y/n) > {Colors.CLEAR}').lower() in ['y', 'yes']:
                         continue
                     return None
                 break
-            console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): Username and password hash match...')
+            console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} Username and password hash match...')
             if RP.requires_2FA(username):
-                console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}@{RP.name}" requires 2FA...')
-                console.log(RP.classname).print(f'     $RP({RP.name}): Sending request to client for user to insert and auth using YubiKey for the respective account...')
+                console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} User="{username}@{RP.name}" requires 2FA...')
+                console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Sending request to client for user to insert and auth using YubiKey for the respective account...')
                 if not reinstating: time.sleep(0.1)
                 YK: Optional[YubiKey] = connection.request_yubikey_insert_from_OS(username)
                 if not YK:
                     if not reinstating: time.sleep(1.2)
-                    console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}@{RP.name}" timmed out')
+                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} User="{username}@{RP.name}" timmed out')
                     console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                     return None
                 challenge: Optional[Challenge] = RP.request_challenge(username, session_token, YK) # will print generating challenge
@@ -1006,8 +1022,8 @@ class Client:
                     if not reinstating: time.sleep(1.5)
                     console.log('Client').print(f'   $Client({self.name}): Request for "challenge request" timemed out')
                     if not reinstating: time.sleep(1.2)
-                    console.log(RP.classname).print(f'     $RP({RP.name}): Request for "challenge request" from usr="{username}" timmed out')
-                    console.log(RP.classname).print(f'     $RP({RP.name}): Sending "{username}" back to main menu')
+                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Request for "challenge request" from usr="{username}" timmed out')
+                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Sending "{username}" back to main menu')
                     return None
                 console.log('Client').print(f'   $Client({self.name}): Recieved challenge from RP({RP.name})')
                 console.log('Client').print(f'   $Client({self.name}): Verifying source of challenge . . .')
@@ -1020,7 +1036,7 @@ class Client:
                     console.log('Client').print(f'   $Client({self.name}): Failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
                     space = ' ' * len(f'   $Client({self.name}): ')
                     console.log('Client').print(f'{space}... ignoring challenge')
-                    console.log(RP.classname).print(f'     $RP({RP.name}): usr="{username}" timmed out')
+                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} usr="{username}" timmed out')
                     console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                     return None
                 self.print_backend(f'RP({RP.name}) == RP({challenge.RP_ID})')
@@ -1044,7 +1060,7 @@ class Client:
                     console.log('OperatingSystem').print(f' $OperatingSystem: Letting challenge time out...')
                     if not reinstating: time.sleep(0.8)
                     console.log('Client').print(f'   $Client({self.name}): Challenge timmed out...')
-                    console.log(RP.classname).print(f'     $RP({RP.name}): Challenge timmed out...')
+                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Challenge timmed out...')
                     return None
                 response: YubiKeyResponse = connection.request_yubikey_auth_from_OS(YK.ID, challenge)
                 console.log('OperatingSystem').print(f' $OperatingSystem: Receved YubiKey authentication in the form of a signed nonce.')
@@ -1057,11 +1073,11 @@ class Client:
                 console.log('Client').print(f"  $Client({self.name}): MFA login successful!")
             else:
                 RP.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}@{RP.name}){Colors.CLEAR}')
-                console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username}@{RP.name} does not have 2FA configured -> skipping 2FA')
-            console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): User={username}@{RP.name} Access Granted!')
+                console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} User={username}@{RP.name} does not have 2FA configured -> skipping 2FA')
+            console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} User={username}@{RP.name} Access Granted!')
         except KeyboardInterrupt as ki:
             return None
-        console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}): Passing SessionToken({get_rand_id(18)}) to Client')
+        console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} Passing SessionToken({get_rand_id(18)}) to Client')
         return session_token
 
     def print_backend(self, message: str) -> None:
@@ -1084,7 +1100,7 @@ def is_signed(nonce: bytes, public_key, response: bytes, RP_name: str = '') -> b
         console.log('RelyingParty').print_backend(
             f'       $RP({RP_name}).', 
             'crypto_backend.AsymetricDecr:', 
-            f' Trying to decrypt response="0x{response.hex()}" using public key on file 0x{YubiKey.public_key_to_bytes(public_key).hex()}'
+            f' Trying to decrypt response="{bytes_to_base64(response)}" using public key on file {bytes_to_base64(YubiKey.public_key_to_bytes(public_key))}'
         )
         # Verify the signature using the public key
         public_key.verify(
@@ -1192,6 +1208,11 @@ class UserFacingConnection:
 
     def available_actions(self, client: Client, rp: RelyingParty) -> List[ConnectionAction]:
         print('')
+        statement: Optional[List[str]] = None if rp.name == rp._pretending_to_be else [
+            f' << RP({rp.name}) establishing connection to RP({rp._pretending_to_be}) >>',
+            f'    > Connection established <',
+            f' << RP({rp.name}) is now forwarding everything to and from RP({rp._pretending_to_be}) >>'
+        ]
         global reinstating
         if self.is_logged_in():
             console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
@@ -1200,6 +1221,12 @@ class UserFacingConnection:
             if not reinstating: time.sleep(0.1)
             console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
         else:
+            if not reinstating and statement:
+                for i, s in enumerate(statement):
+                    console.log('RelyingParty').print(f'     {s}')
+                    if i % 2 == 0:
+                         time.sleep(1)
+                print('')
             console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
             if not reinstating: time.sleep(0.1)
             console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for ConnectionType=\"not logged in\"")

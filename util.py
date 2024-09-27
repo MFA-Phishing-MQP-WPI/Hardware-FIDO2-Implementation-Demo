@@ -24,6 +24,8 @@ from display import Colors
 
 
 # SECTION::DEF global variables
+debug_mode: bool = False
+reinstating: bool = True
 state_saved: bool = False
 display_backend: bool = True
 console: Colors = Colors(display=True, backend=True)
@@ -33,12 +35,11 @@ edit_classes_pre_intialization: Dict[str, bool] = {
     'RelyingParty': False,
     'Account': False,
     'SessionToken': False,
-    'YubiKeyResponse': False,
     'MFARegistrationRequest': False,
     'MFARegistrationApproval': False,
     'YubiKey': False,
-    'Challenge': False,
-    'YubiKeyResponse': False
+    'YubiKeyResponse': False,
+    'Challenge': False
 }
 
 
@@ -67,7 +68,7 @@ class Hasher:
             global cursor
             for i in range(12):
                 Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {cursor[i%len(cursor)]}', end='\r')
-                time.sleep(0.1)
+                if not reinstating:time.sleep(0.1)
             salt = os.urandom(32)
             Hasher.print_backend(self.RP_name, display, f'No salt provided ... Generating random salt: {bytes_to_base64(salt)}  ')
         Hasher.print_backend(self.RP_name, display, f'Initializing Hasher object from password="{password}" and salt={bytes_to_base64(salt)}...')
@@ -83,9 +84,10 @@ class Hasher:
         if _force:
             return f"{self.hashed_password}:{self.salt.hex()}"
         global cursor
+        global reinstating
         for i in range(12):
             Hasher.print_backend(self.RP_name, display, f'Generating hash string... {cursor[i%len(cursor)]}', end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
         Hasher.print_backend(self.RP_name, display, f'Generating hash string... (i.e. "[hashed_password]:[salt]")')
         Hasher.print_backend(self.RP_name, display, f'Resulting hash: "{self.hashed_password}"')
         return f"{self.hashed_password}:{self.salt.hex()}"
@@ -146,13 +148,14 @@ class YubiKey:
             secret = YubiKey._gen_secret(print_fun=True)
         if not ID:
             ID = get_rand_id(12)
+        global reinstating
         self._device_secret: bytes = secret
         self.ID: str = ID
         msg = 'Initializing for the first time...'
         if not _first_time:
             msg = 'Reloading ...'
         console.log('YubiKey').print(f'$YK({self.ID}): {msg}')
-        time.sleep(0.1)
+        if not reinstating: time.sleep(0.1)
     
     def __str__(self) -> str:
         return f'<YubiKey>id={self.ID}, device_secret=0x{self._device_secret.hex()}</YubiKey>'
@@ -162,13 +165,14 @@ class YubiKey:
 
     def register_account(self, request: MFARegistrationRequest) -> MFARegistrationApproval:
         global cursor
+        global reinstating
         for i in range(12):
             console.log('YubiKey').print_backend(
                 f'$YK({self.ID})', 
                 '.crypto_backend.approval :', 
                 f'Calculating private key for RP({request.RP_ID}) + User="{request.username}@{request.RP_ID}" {cursor[i%len(cursor)]}',
                 end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
         console.log('YubiKey').print_backend(
             f'$YK({self.ID})', 
             '.crypto_backend.approval :', 
@@ -184,7 +188,7 @@ class YubiKey:
                 '.crypto_backend.approval :', 
                 f'Calculating public key for PrivateKey({id}) {cursor[i%len(cursor)]}',
                 end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
         _, public_key = self._generate_key_pair(request.RP_ID, request.username)
         pubk: str = f'{bytes_to_base64(YubiKey.public_key_to_bytes(public_key))}'
         console.log('YubiKey').print_backend(
@@ -328,9 +332,13 @@ class Account:
         # Get the matches, convert password hash to bytes, handle public key 'None'
         username = username_match.group(1) if username_match else None
         password_hash_str = password_match.group(1) if password_match else None
+        if debug_mode:
+            print(f'{Colors.CYAN} --d for account={username} {public_key_match.group(1)=}'[:60] + f'{Colors.CLEAR}')
+        pk_m = public_key_match.group(1) if public_key_match else None
+        pk_v: Optional[str] = pk_m if pk_m != 'None' else None
         public_key = YubiKey.bytes_to_public_key(
-            bytes.fromhex(public_key_match.group(1)[2:])
-        ) if public_key_match else None
+            bytes.fromhex(pk_v[2:])
+        ) if pk_v else None
         public_key_to_display = public_key_to_display_match.group(1) if public_key_to_display_match else None
 
 
@@ -374,9 +382,10 @@ class SessionToken:
         RP: RelyingParty = by_connection.website
         console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Going to generate SessionToken with auth_type={self.auth_type} for user={account}@{RP.name}. Note: this user requires auth_type={auth_type_required}")
         global cursor
+        global reinstating
         for i in range(12):
             console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Generating SessionToken {cursor[i%len(cursor)]}", end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
         console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Generated SessionToken with auth_type={self.auth_type} for user={account}@{RP.name}")
     
     def __str__(self) -> str:
@@ -408,6 +417,7 @@ class SessionToken:
 class Challenge:
     def __init__(self, RP: 'RelyingParty', username: str, token_1FA: 'SessionToken', NonceID: str, Nonce: bytes):
         RP_name = RP.name
+        global reinstating
         global edit_classes_pre_intialization
         global cursor
         if edit_classes_pre_intialization['Challenge']:
@@ -417,20 +427,21 @@ class Challenge:
                 console.log('Challenge').post()
                 if input(question).lower() in ['y', 'yes']:
                     console.log('Challenge').post()
-                    RP_name = input(f'         --dbuger Challenge.__init__(RP_name={Colors.MAGENTA}')
+                    RP_name = input(f'         --dbuger Challenge.__init__(RP_name="{Colors.MAGENTA}')
                     Colors.clear_display()
                     console.log('Challenge').post()
-                    username = input(f'         --dbuger Challenge.__init__(RP_name="{RP_name}", username={Colors.MAGENTA}')
+                    username = input(f'{Colors.REVERSE_NEWLINE}         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{Colors.MAGENTA}')
                     Colors.clear_display()
                     console.log('Challenge').post()
-                    resp = input(f'         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce={Colors.MAGENTA}')
+                    resp = input(f'{Colors.REVERSE_NEWLINE}         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{Colors.MAGENTA}')
                     Colors.clear_display()
                     Nonce = base64_to_bytes(resp)
+                    console.log('Challenge').print(f'{Colors.REVERSE_NEWLINE}         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}")')
                     console.log('Challenge').print(f'         --OVERRIDE::Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}")')
                     Colors.clear_display()
                     for i in range(8):
                         console.log('Challenge').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation {cursor[i%len(cursor)]}', end='\r')
-                        time.sleep(0.1)
+                        if not reinstating: time.sleep(0.1)
                     console.log('Challenge').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation - success')
             except KeyboardInterrupt:
                 Colors.clear_display()
@@ -447,7 +458,7 @@ class Challenge:
         self.nonce = Nonce
         nonce_cut = f'{Nonce}'[:20] + '...'
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f' Generating challenge ...')
-        time.sleep(0.2)
+        if not reinstating: time.sleep(0.2)
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'     Challenge(')
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         user={username}@{RP_name}, ')
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         SessionToken({token_1FA.ID}),')
@@ -456,7 +467,7 @@ class Challenge:
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'     )')
         for i in range(16):
             console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f' Signing challenge using RP({RP_name}) {cursor[i%len(cursor)]}', end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f' Signing challenge using RP({RP_name}) - success')
 
 
@@ -471,7 +482,8 @@ class RelyingParty:
         self.p(f'initializing for the first time...')
         global Tracker
         Tracker.append(self)
-        time.sleep(0.2 + 0.05 * len(self.accounts.keys()))
+        global reinstating
+        if not reinstating: time.sleep(0.2 + 0.05 * len(self.accounts.keys()))
 
     def __str__(self) -> str:
         accounts: List[Account] = []
@@ -527,15 +539,18 @@ class RelyingParty:
             acc: Account = self.accounts[session.for_account]
             self.p(f'Account Information:')
             self.p(f'\tUsername:      {acc.name}')
-            self.p(f'\tPassword Hash: {bytes_to_base64(acc.password_hash.encode("utf8"))}')
+            self.p(f'\tPassword Hash: {bytes_to_base64(acc.password_hash.encode("utf8"))}'[:100])
             self.p(f'\tPassword Salt: {acc.salt}')
-            pub = f'{YubiKey.public_key_to_bytes(acc.public_key)}'.replace("-----BEGIN PUBLIC KEY-----\n", "").replace("\n-----END PUBLIC KEY-----\n", "")
+            pub = 'None'
+            if acc.public_key:
+                pub = f'{YubiKey.public_key_to_bytes(acc.public_key)}'.replace("-----BEGIN PUBLIC KEY-----\n", "").replace("\n-----END PUBLIC KEY-----\n", "")
             self.p(f'\tPublic Key:    {pub}')
             return True
         except KeyboardInterrupt as ki:
             return False
 
     def update_account_MFA(self, session: Optional[SessionToken]) -> bool:
+        global reinstating
         try:
             if not session or not session.is_valid(session.for_account, session.account_requires):
                 self.p(f'{session.for_account} as been inactive for too long.')
@@ -548,33 +563,33 @@ class RelyingParty:
                 return False
             client: Client = session.by_connection.client
             self.p(f'Sending request to Client({client.name})', end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             self.p(f'Sending request to Client({client.name}) .', end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             self.p(f'Sending request to Client({client.name}) . .', end='\r')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             self.p(f'Sending request to Client({client.name}) . . .')
-            time.sleep(0.05)
+            if not reinstating: time.sleep(0.05)
             
             request: MFARegistrationRequest = MFARegistrationRequest(self.name, session.for_account)
             approval: Optional[MFARegistrationApproval] = client.request_registration(request, self, session.by_connection.UI_ptr)
 
             if not approval:
                 self.p('Waiting for approval ', end='\r')
-                time.sleep(0.4)
+                if not reinstating: time.sleep(0.4)
                 self.p('Waiting for approval .', end='\r')
-                time.sleep(0.4)
+                if not reinstating: time.sleep(0.4)
                 self.p('Waiting for approval . .', end='\r')
-                time.sleep(0.4)
+                if not reinstating: time.sleep(0.4)
                 self.p('Waiting for approval . . .')
-                time.sleep(0.4)
+                if not reinstating: time.sleep(0.4)
                 self.p('Request timmed out')
                 return False
             
             self.p('Waiting for approval ', end='\r')
-            time.sleep(0.2)
+            if not reinstating: time.sleep(0.2)
             self.p('Waiting for approval .', end='\r')
-            time.sleep(0.05)
+            if not reinstating: time.sleep(0.05)
             self.p(f'Recieved approval from Client({client.name})')
             self.accounts[session.for_account].public_key = approval.public_key
             self.accounts[session.for_account].public_key_to_display = f'YK({approval.YubiKeyID})'
@@ -608,18 +623,18 @@ class RelyingParty:
         try:
             client_name = connection.client.name
             console.log('Client').print(f'   $Client({client_name}): Requesting new account from RP({self.name})')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             self.p(f'Recieved new account request from Client({client_name})')
             self.p(f'Forwarding new account message and form to Client({client_name})')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             console.log('Client').print(f'   $Client({client_name}): Recieved new account message and form from RP({self.name})')
             console.log('Client').print(f'   $Client({client_name}): Printing new account message and requesting new account form from user...')
-            time.sleep(0.2)
+            if not reinstating: time.sleep(0.2)
             print('')
-            time.sleep(0.25)
+            if not reinstating: time.sleep(0.25)
             console.log('Client').print(f'   $Client({client_name}): WELCOME NEW USER TO {self.name.capitalize()}!')
             console.log('Client').print(f'   $Client({client_name}): Let\'s create a new account!')
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             console.log('Client').post()
             username = input(f'   $Client({client_name}): Enter your username > {Colors.CLEAR}')
             console.log('Client').print(f'   $Client({client_name}): Enter your password {Colors.CLEAR}', end='')
@@ -634,10 +649,10 @@ class RelyingParty:
             console.clear()
             if not self.add_account(username, password):
                 return False
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             self.p(f'{Colors.CLEAR}{Colors.GREEN_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.GREEN} AccountExceptions.MFA_Missing(user={username}@{self.name}){Colors.CLEAR}')
             self.p(f'Sending message to Client({self.name}): "ACCOUNT {username.upper()} DOES NOT HAVE 2FA CONFIGURED"')
-            time.sleep(0.3)
+            if not reinstating: time.sleep(0.3)
             console.log(self.classname).print(f'{self.INDENT}$RP({self.name})::WARNING ACCOUNT {username.upper()} DOES NOT HAVE 2FA CONFIGURED')
             self.p(f'Account {username} created successfully!')
             self.show_table_question()
@@ -737,17 +752,17 @@ class RelyingParty:
             console.log(self.classname).print(f' --d $RP({self.name}): Username could not be found! Sending code "HTTP 403" back to Client')
             return False
         console.log(self.classname).print(f'     $RP({self.name}): Hashing password with stored salt to compare against stored hashed password...')
-        time.sleep(0.1)
+        if not reinstating: time.sleep(0.1)
         response: bool = self.accounts[username].has_same_password(self.name, password)
         if response:
             console.log(self.classname).print(f' --d $RP({self.name}): Password Hash matches! Sending code "HTTP 200" back to Client')
         else:
             console.log(self.classname).print(f' --d $RP({self.name}): Password Hash does not match! Sending code "HTTP 403" back to Client')
-        time.sleep(0.1)
+        if not reinstating: time.sleep(0.1)
         return response
     def grant_session_token_1FA(self, username: str, password: str, by_connection: 'Connection') -> Optional[SessionToken]:
         console.log(self.classname).print(f'     $RP({self.name}): Recieved Tuple(Username, Password) from Client({self.name})')
-        time.sleep(0.1)
+        if not reinstating: time.sleep(0.1)
         if self.valid_login(username, password):
             # grant user token for 1FA
             # it will time out in 3 minutes (0.05 hours) unless user authenticates with 2FA
@@ -779,7 +794,7 @@ class RelyingParty:
             
             console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is valid for this user')
             console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Checking YubiKey signature ...')
-            time.sleep(0.2)
+            if not reinstating: time.sleep(0.2)
             if is_signed(
                 response.nonce,
                 self.accounts[session.for_account].public_key,
@@ -865,20 +880,37 @@ class Connection:
         rp_name: str = self.website.name
         console.log('Client').print(f'   $Client({c_name}): Got request from RP({rp_name}) for username: {username}@{rp_name} to enter YubiKey to request Challenge.')
         console.log('Client').print(f'   $Client({c_name}): Passing request to Operating System on behalf of RP({rp_name})...')
-        time.sleep(0.2)
+        if not reinstating: time.sleep(0.2)
         return self.UI_ptr.insert_yubikey(self, username)
 
     def request_yubikey_auth_from_OS(self, ykID: int, challenge: Challenge) -> YubiKeyResponse:
-            return self.UI_ptr.YubiKey_auth(ykID, challenge)
+        n_short: str = f'{challenge.nonce}'[:12]
+        global cursor
+        for i in range(8):
+            console.log('YubiKey').print_backend(
+                f'$YK({ykID})',  
+                '.crypto_backend.authentic:', 
+                f' Signing nonce({n_short}...) {cursor[i%len(cursor)]}',
+                end='\r')
+            if not reinstating: time.sleep(0.1)
+        console.log('YubiKey').print_backend(
+            f'$YK({ykID})',  
+            '.crypto_backend.authentic:', 
+            f' Signed nonce({n_short}...) successfully')
+        console.log('YubiKey').print_backend(
+            f'$YK({ykID})',  
+            '.crypto_backend.authentic:', 
+            f' Passing signature to OperatingSystem')
+        return self.UI_ptr.YubiKey_auth(ykID, challenge)
     def login(self) -> bool:
         token: SessionToken = self.client._login_user(self)
         if token:
             self.session_token = token
             console.log('Client').print(f'   $Client({self.client.name}): Successfully logged in as "{self.session_token.for_account}"')
-            time.sleep(0.2)
+            if not reinstating: time.sleep(0.2)
             return True
         console.log('Client').print(f'   $Client({self.client.name}): Failed to login')
-        time.sleep(0.2)
+        if not reinstating: time.sleep(0.2)
         return False
     
     def is_logged_in(self) -> bool:
@@ -890,7 +922,7 @@ class Client:
         self.name = name
         # self.websites: Dict[str, RelyingParty] = {}
         console.log('Client').print(f'   $Client({self.name}): initializing for the first time...')
-        time.sleep(0.25)
+        if not reinstating: time.sleep(0.25)
 
     def request_registration(self, request: MFARegistrationRequest, talking_to: RelyingParty, operating_system: 'OperatingSystem') -> Optional[MFARegistrationApproval]:
         console.log('Client').print(f'   $Client({self.name}): Recieved request for MFA registration for account="{request.username}"')
@@ -899,7 +931,7 @@ class Client:
             console.log('Client').print(f'   $Client({self.name}): Ignoring request.')
             return None
         console.log('Client').print(f'   $Client({self.name}): Verified that we are communicating with RP({talking_to.name}). This RP ID matches what was provided in the request (i.e. {request.RP_ID}).') 
-        time.sleep(0.25)
+        if not reinstating: time.sleep(0.25)
         console.log('Client').print(f'   $Client({self.name}): Passing request to Operating System.')
         response: Optional[MFARegistrationApproval] = operating_system.approve_mfa_registration_request(request, self)
         if response:
@@ -907,7 +939,7 @@ class Client:
             console.log('Client').print(f'   $Client({self.name}): Passing approval to RP({talking_to.name}).')
             return response
         console.log('Client').print(f' $Client({self.name}): did not recieve approval yet ... still waiting ')
-        time.sleep(0.35)
+        if not reinstating: time.sleep(0.35)
         return None
 
     def add_website(self, website: RelyingParty):
@@ -931,6 +963,7 @@ class Client:
 
 
     def _login_user(self, connection: Connection) -> Optional[SessionToken]:
+        global reinstating
         try:
             global WEBSITES
             web_name = connection.website.name
@@ -960,19 +993,19 @@ class Client:
             if RP.requires_2FA(username):
                 console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}@{RP.name}" requires 2FA...')
                 console.log(RP.classname).print(f'     $RP({RP.name}): Sending request to client for user to insert and auth using YubiKey for the respective account...')
-                time.sleep(0.1)
+                if not reinstating: time.sleep(0.1)
                 YK: Optional[YubiKey] = connection.request_yubikey_insert_from_OS(username)
                 if not YK:
-                    time.sleep(1.2)
+                    if not reinstating: time.sleep(1.2)
                     console.log(RP.classname).print(f'     $RP({RP.name}): User="{username}@{RP.name}" timmed out')
                     console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
                     return None
                 challenge: Optional[Challenge] = RP.request_challenge(username, session_token, YK) # will print generating challenge
                 if not challenge:
                     console.log('Client').print(f'   $Client({self.name}): Waiting ...')
-                    time.sleep(1.5)
+                    if not reinstating: time.sleep(1.5)
                     console.log('Client').print(f'   $Client({self.name}): Request for "challenge request" timemed out')
-                    time.sleep(1.2)
+                    if not reinstating: time.sleep(1.2)
                     console.log(RP.classname).print(f'     $RP({RP.name}): Request for "challenge request" from usr="{username}" timmed out')
                     console.log(RP.classname).print(f'     $RP({RP.name}): Sending "{username}" back to main menu')
                     return None
@@ -996,24 +1029,27 @@ class Client:
                 global cursor
                 for i in range(14):
                     console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication {cursor[i%len(cursor)]}', end='\r')
-                    time.sleep(0.1)
+                    if not reinstating: time.sleep(0.1)
                 console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication  ')
                 console.log('YubiKey').print_backend(
                     f'$YK({YK.ID})',  
                     '.crypto_backend.authentic:', 
-                    f'Recieved Challenge from Operating System on behalf of Client on behalf of RP.')
+                    f' Recieved Challenge from Operating System on behalf of Client on behalf of RP.')
                 console.log('YubiKey').print_backend(
                     f'$YK({YK.ID})',  
                     '.crypto_backend.authentic:', 
-                    f'Waiting for User to press YubiKey button to authenitcate')
+                    f' Waiting for User to press YubiKey button to authenitcate')
                 console.log('OperatingSystem').post()
                 if input(f" $OperatingSystem: Press the YubiKey to authenticate? (Y/n) > {Colors.CLEAR}").lower() not in ['y', 'yes']:
                     console.log('OperatingSystem').print(f' $OperatingSystem: Letting challenge time out...')
-                    time.sleep(0.8)
+                    if not reinstating: time.sleep(0.8)
                     console.log('Client').print(f'   $Client({self.name}): Challenge timmed out...')
                     console.log(RP.classname).print(f'     $RP({RP.name}): Challenge timmed out...')
                     return None
                 response: YubiKeyResponse = connection.request_yubikey_auth_from_OS(YK.ID, challenge)
+                console.log('OperatingSystem').print(f' $OperatingSystem: Receved YubiKey authentication in the form of a signed nonce.')
+                console.log('OperatingSystem').print(f' $OperatingSystem: Sending authentication to client({self.name})...')
+                if not reinstating: time.sleep(0.15)
                 session_token: Optional[SessionToken] = RP.grant_session_token_MFA(username, session_token, response, connection)
                 if not session_token:
                     console.log('Client').print(f'   $Client({self.name}): Recieved "HTML 403" as a response from RP({RP.name})')
@@ -1130,7 +1166,10 @@ def base64_to_bytes(base64_string: str) -> bytes:
 class UserFacingConnection:
     def __init__(self, connection: Connection):
         self.connection: Connection = connection
+        self.ID = get_rand_id(10)
     def execute(self, action: ConnectionAction) -> bool:
+        global reinstating
+        reinstating = False
         if action == ConnectionAction.Show_Account_Tables:
             return self.connection.website.display_table()
         if action == ConnectionAction.Login:
@@ -1146,19 +1185,25 @@ class UserFacingConnection:
         if action == ConnectionAction.Update_MFA:
             return self.connection.website.update_account_MFA(self.connection.session_token)
 
+    def __str__(self):
+        return f"UserFacingConnection(self.ID)"
+    def __repr__(self) -> str:
+        return self.__str__()
+
     def available_actions(self, client: Client, rp: RelyingParty) -> List[ConnectionAction]:
         print('')
+        global reinstating
         if self.is_logged_in():
             console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for ConnectionType=\"logged in user={self.connection.session_token.for_account}@{self.connection.website.name}\"")
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
         else:
             console.log('Client').print(f"  $Client({client.name}): Requesting a list of legal actions from RP({rp.name})")
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             console.log('RelyingParty').print(f"    $RP({rp.name}): Got request from Client({client.name}) for legal actions ... returning legal actions for ConnectionType=\"not logged in\"")
-            time.sleep(0.1)
+            if not reinstating: time.sleep(0.1)
             console.log('Client').print(f"  $Client({client.name}): Recieved list of legal actions from RP({rp.name}).")
             
         print('')
@@ -1360,7 +1405,8 @@ class OperatingSystem:
         global cursor
         for i in range(18):
             console.log('OperatingSystem').print(f' $OperatingSystem: Inserting YubiKey({selectedYubiKeyName}) {cursor[i%len(cursor)]}', end='\r')
-            time.sleep(0.15)
+            global reinstating
+            if not reinstating: time.sleep(0.15)
     # will always return bytes, may be wrong but will always return bytes (never None)
     def YubiKey_auth(self, ykID: int, challenge: Challenge) -> YubiKeyResponse:
         YK: YubiKey = self.YubiKeys[ykID]

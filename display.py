@@ -1,4 +1,5 @@
 import fix_colors
+from terminal import running_on_PowerShell
 
 class VOID:
     @staticmethod
@@ -42,6 +43,8 @@ class Colors:
     BLUE_REVERSE = "\033[104;97m"  # "\033[44;97m"
     CYAN_REVERSE = "\033[46;97m"
     MAGENTA_REVERSE = "\033[45;97m"
+
+    REVERSE_NEWLINE = "" if running_on_PowerShell() else "\033[F"
 
     def __init__(self, display=False, backend=True):
         self.display = display

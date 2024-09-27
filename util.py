@@ -1065,7 +1065,10 @@ class Client:
                 response: YubiKeyResponse = connection.request_yubikey_auth_from_OS(YK.ID, challenge)
                 console.log('OperatingSystem').print(f' $OperatingSystem: Receved YubiKey authentication in the form of a signed nonce.')
                 console.log('OperatingSystem').print(f' $OperatingSystem: Sending authentication to client({self.name})...')
-                if not reinstating: time.sleep(0.15)
+                if not reinstating: time.sleep(0.1)
+                console.log('Client').print(f"  $Client({self.name}): Recieved Yubikey auth from OS...")
+                console.log('Client').print(f"  $Client({self.name}): Passing Yubikey auth to RP...")
+                if not reinstating: time.sleep(0.1)
                 session_token: Optional[SessionToken] = RP.grant_session_token_MFA(username, session_token, response, connection)
                 if not session_token:
                     console.log('Client').print(f'   $Client({self.name}): Recieved "HTML 403" as a response from RP({RP.name})')

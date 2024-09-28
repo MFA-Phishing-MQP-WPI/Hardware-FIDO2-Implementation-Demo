@@ -9,7 +9,9 @@ run_conditions: Dict[str, any] = {
     "-display_crypto_backend": False,
     '-help': False,
     '-debug_mode': False,
-    '-debug_challenge': False
+    '-debug_challenge': False,
+    '-debug_yubikey': False,
+    '-all_flags': False
 }
 
 help_runers: Tuple[Dict[str, str], Dict[str, Tuple[str, str]]] = (
@@ -17,7 +19,9 @@ help_runers: Tuple[Dict[str, str], Dict[str, Tuple[str, str]]] = (
         '-help': 'prints this help message',
         '-display_crypto_backend': 'displays actions completd by the cryptographic backend',
         '-debug_mode': 'prints the value of all private keys at runtime start',
-        '-debug_challenge': 'lets user edit the values that create the challenge before it is sent to YubiKey for authentication'
+        '-debug_challenge': 'lets user edit the values that create the challenge before it is sent to YubiKey for authentication',
+        '-debug_yubikey': 'lets user edit the values that create the YubiKey',
+        '-all_flags': 'acts as all flags (except for -help flag)'
     },
     {
         '--launch-from-save [.dump file]': 
@@ -58,6 +62,11 @@ class Parser:
             if run_conditions['--launch-from-save'] and not os.path.exists(run_conditions['--launch-from-save']):
                 COLOR_CODES.err('ERROR::Fail To Open', f": Could not find or open .dump file \"{run_conditions['--launch-from-save']}\" in local dir.")
                 self.print_help_statement_and_close()
+            if run_conditions['-all_flags']:
+                for flag_name in help_runers[0].keys():
+                    if flag_name in ['-help', '-all_flags']:
+                        continue
+                    run_conditions[flag_name] = True
         return run_conditions if not run_conditions['-help'] else self.print_help_statement_and_close()
     
     def _arg_affy(self, args: List[str]) -> Tuple[List[str], Dict[str, str]]:

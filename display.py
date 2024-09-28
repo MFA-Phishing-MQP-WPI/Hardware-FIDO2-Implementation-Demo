@@ -39,7 +39,7 @@ class Colors:
     # Reverse colors (color highlight with white text)
     GREEN_REVERSE = "\033[42;97m"
     RED_REVERSE = "\033[41;97m"
-    YELLOW_REVERSE = "\033[43;97m"
+    YELLOW_REVERSE = "\033[40;97m" if running_on_PowerShell() else "\033[6;43;97m" # "\033[103;97m"# "\033[43;97m"
     BLUE_REVERSE = "\033[104;97m"  # "\033[44;97m"
     CYAN_REVERSE = "\033[46;97m"
     MAGENTA_REVERSE = "\033[45;97m"
@@ -54,7 +54,7 @@ class Colors:
             'RelyingParty': GREEN,
             'YubiKey': YELLOW,
             'YubiKey Factory' : DARK_YELLOW_BOLD,
-            'Challenge': CYAN
+            'Debugger_Override': CYAN
         }
         if not backend:
             global backend_display

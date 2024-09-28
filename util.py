@@ -26,7 +26,7 @@ from display import Colors
 # SECTION::DEF global variables
 debug_mode: bool = False
 reinstating: bool = True
-state_saved: bool = False
+state_saved: bool = True
 display_backend: bool = True
 console: Colors = Colors(display=True, backend=True)
 WEBSITES: Dict[str, 'RelyingParty'] = {}
@@ -146,6 +146,29 @@ class MFARegistrationApproval:
 
 class YubiKey:
     def __init__(self, secret:Optional[bytes]=None, ID:Optional[str]=None, _first_time=True):
+        global edit_classes_pre_intialization
+        if edit_classes_pre_intialization['YubiKey']:
+            try:
+                s = 'None' if not secret else f'"{bytes_to_base64(secret)}"'
+                question: str = f'         --dbuger YubiKey.__init__(ID="{ID}", secret={s}) override? (Y/n) > {Colors.MAGENTA}'
+                Colors.clear_display()
+                console.log('Debugger_Override').post()
+                if input(question).lower() in ['y', 'yes']:
+                    console.log('Debugger_Override').post()
+                    ID = input(f'         --dbuger YubiKey.__init__(ID="{Colors.MAGENTA}')
+                    Colors.clear_display()
+                    console.log('Debugger_Override').post()
+                    s = input(f'{Colors.REVERSE_NEWLINE}         --dbuger YubiKey.__init__(ID="{ID}", secret="{Colors.MAGENTA}')
+                    Colors.clear_display()
+                    secret = None if s.lower() == 'none' else s
+                    s = 'None' if s.lower() == 'none' else f'"{s}"'
+                    console.log('Debugger_Override').print(f'{Colors.REVERSE_NEWLINE}{Colors.CYAN}         --dbuger YubiKey.__init__(ID="{ID}", secret={s})')
+                    console.log('Debugger_Override').print(f'         --OVERRIDE::YubiKey.__init__(ID="{ID}", secret={s})')
+                    Colors.clear_display()
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                Colors.clear_display()
+
         if not secret:
             secret = YubiKey._gen_secret(print_fun=True)
         if not ID:
@@ -154,8 +177,11 @@ class YubiKey:
         self._device_secret: bytes = secret
         self.ID: str = ID
         msg = 'Initializing for the first time...'
+        global state_saved
         if not _first_time:
             msg = 'Reloading ...'
+        else:
+            state_saved = False
         console.log('YubiKey').print(f'$YK({self.ID}): {msg}')
         if not reinstating: time.sleep(0.1)
     
@@ -302,6 +328,8 @@ class Account:
         self.password_hash, self.salt = self._hasher_object.hash_str().split(':')
         self.public_key = pk
         self.public_key_to_display = pk_id
+        global state_saved
+        state_saved = False
 
     def has_same_password(self, RP_name: str, password: str, f:Optional[str]=None) -> bool:
         return Hasher.is_correct_password(
@@ -427,25 +455,25 @@ class Challenge:
             try:
                 question: str = f'         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}") override? (Y/n) > {Colors.MAGENTA}'
                 Colors.clear_display()
-                console.log('Challenge').post()
+                console.log('Debugger_Override').post()
                 if input(question).lower() in ['y', 'yes']:
-                    console.log('Challenge').post()
+                    console.log('Debugger_Override').post()
                     RP_name = input(f'         --dbuger Challenge.__init__(RP_name="{Colors.MAGENTA}')
                     Colors.clear_display()
-                    console.log('Challenge').post()
+                    console.log('Debugger_Override').post()
                     username = input(f'{Colors.REVERSE_NEWLINE}         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{Colors.MAGENTA}')
                     Colors.clear_display()
-                    console.log('Challenge').post()
+                    console.log('Debugger_Override').post()
                     resp = input(f'{Colors.REVERSE_NEWLINE}         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{Colors.MAGENTA}')
                     Colors.clear_display()
                     Nonce = base64_to_bytes(resp)
-                    console.log('Challenge').print(f'{Colors.REVERSE_NEWLINE}         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}")')
-                    console.log('Challenge').print(f'         --OVERRIDE::Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}")')
+                    console.log('Debugger_Override').print(f'{Colors.REVERSE_NEWLINE}         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}")')
+                    console.log('Debugger_Override').print(f'         --OVERRIDE::Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}")')
                     Colors.clear_display()
                     for i in range(8):
-                        console.log('Challenge').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation {cursor[i%len(cursor)]}', end='\r')
+                        console.log('Debugger_Override').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation {cursor[i%len(cursor)]}', end='\r')
                         if not reinstating: time.sleep(0.1)
-                    console.log('Challenge').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation - success')
+                    console.log('Debugger_Override').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation - success')
             except KeyboardInterrupt:
                 Colors.clear_display()
                 return
@@ -487,7 +515,10 @@ class RelyingParty:
         global Tracker
         Tracker.append(self)
         global reinstating
-        if not reinstating: time.sleep(0.2 + 0.05 * len(self.accounts.keys()))
+        global state_saved
+        if not reinstating: 
+            time.sleep(0.2 + 0.05 * len(self.accounts.keys()))
+            state_saved = False
 
     def __str__(self) -> str:
         accounts: List[Account] = []
@@ -934,10 +965,12 @@ class Connection:
 
 class Client:
     def __init__(self, name='Chome.exe'):
+        global state_saved
         self.name = name
-        # self.websites: Dict[str, RelyingParty] = {}
         console.log('Client').print(f'   $Client({self.name}): initializing for the first time...')
-        if not reinstating: time.sleep(0.25)
+        if not reinstating: 
+            state_saved = False
+            time.sleep(0.1)
 
     def request_registration(self, request: MFARegistrationRequest, talking_to: RelyingParty, operating_system: 'OperatingSystem') -> Optional[MFARegistrationApproval]:
         console.log('Client').print(f'   $Client({self.name}): Recieved request for MFA registration for account="{request.username}"')
@@ -967,8 +1000,6 @@ class Client:
         console.log('Client').print(f'   $Client({self.name}): attempting to connect to "{website}"')
         if website not in WEBSITES:
             WEBSITES[website] = RelyingParty(website)
-            global state_saved
-            state_saved = False
         return Connection(self, WEBSITES[website], UI_ptr)
     
     def connected_action(self, connection: Connection, action: ConnectionAction) -> bool:
@@ -1134,21 +1165,12 @@ def is_signed(nonce: bytes, public_key, response: bytes, RP_name: str = '') -> b
 def void(*args, **kwargs):
     pass
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+def changes_made() -> bool:
+    global state_saved
+    return not state_saved
+def end_reinstating():
+    global reinstating
+    reinstating = False
 
 import getpass
 
@@ -1157,13 +1179,6 @@ class RunContext(Enum):
     AUTO_DETECT = 1
     INTERACTIVE = 2
 
-# class Console:
-#     def __init__(self, context: RunContext):
-#        self.context: RunContext = context
-#     
-#     def log(self, *args, **kwargs):
-#         if self.context == RunContext.AUTO_DETECT:
-#            print(*args, **kwargs)
 
 __KNOWN_WEBSITES__: Dict[str, str] = {
     'Microsoft': 'login.microsoft.com',
@@ -1302,10 +1317,8 @@ class OperatingSystem:
         secret = os.urandom(32)
         YK = YubiKey(secret)
         self.YubiKeys[YK.ID] = YK
-        console.log('YubiKey Factory').print(f"     $YubiKey Factory: creating new YubiKey with ID = {YK.ID}")
-        console.log('YubiKey Factory').print(f"     $YubiKey Factory: hardcoded Yubikey({YK.ID}) with the following secret key: 64{bytes_to_base64(secret)}")
-        global state_saved
-        state_saved = False
+        console.log('YubiKey Factory').print(f"     $YubiKey Factory: creating new YubiKey with ID = '{YK.ID}'")
+        console.log('YubiKey Factory').print(f"     $YubiKey Factory: hardcoded Yubikey('{YK.ID}') with the following secret key: 64{bytes_to_base64(secret)}")
         return YK.ID
     
     def digest_YubiKey_strings(self, yk_strings: List[str]) -> List[str]:
@@ -1324,18 +1337,14 @@ class OperatingSystem:
         if client_name not in self.clients.keys():
             console.log('OperatingSystem').print(f' $OperatingSystem: creating new client "{client_name}"')
             self.clients[client_name] = Client(client_name)
-            global state_saved
-            state_saved = False
         else:
             console.log('OperatingSystem').print(f' $OperatingSystem: client "{client_name}" already exists, restarting client...')
         return self.clients[client_name]
 
-    def _get_connection(self, client_name, website):
+    def _get_connection(self, client_name, website) -> Connection:
         if client_name not in self.clients.keys():
             console.log('OperatingSystem').print(f' $OperatingSystem: creating new client "{client_name}"')
             self.clients[client_name] = Client(client_name)
-            global state_saved
-            state_saved = False
         client = self.clients[client_name]
         return client.connect(website, self)
 
@@ -1347,48 +1356,6 @@ class OperatingSystem:
         global console
         console.set_backend_display(display)
 
-    """
-    def get_website(self, name) -> RelyingParty:
-        url = f'{name.lower()}.com'
-        if name in __KNOWN_WEBSITES__.keys():
-            url = __KNOWN_WEBSITES__[name]
-        if name in self.websites.keys():
-            return self.websites[name]
-        return self.add_website(name, url)
-    def add_website(self, name, url) -> RelyingParty:
-        if name in self.websites.keys():
-            return self.websites[name]
-        website = RelyingParty(url)
-        self.websites[name] = website
-        return website
-    """
-    """
-    def login(self, web_name) -> bool:
-        RP = self.get_website(web_name)
-        if RP.number_of_accounts == 0:
-            print(f'OperatingSystem ERR: No accounts found for "{web_name}". Create an account first.')
-            return False
-        while True:
-            username = input(f' ${RP.name}: Enter username > ')
-            password = getpass.getpass(prompt=f' ${RP.name}: Enter password > ')
-            b_token: Optional[bytes] = RP.grant_session_token_1FA(username, password)
-            if not b_token: 
-                self.console.log(f' ${RP.name}: Username or Password incorrect. Access denied. (1FA Fail)')
-                if input(f'OperatingSystem: Try again? (Y/n) > ').lower() in ['y', 'yes']:
-                    continue
-                return False
-            break
-        if RP.requires_2FA(username):
-            self.console.log(f' ${RP.name}: usr="{username}" requires 2FA...')
-            self.console.log(f' ${RP.name}: insert and auth using YubiKey for the respective account.')
-            if len(self.YubiKeys.keys()) == 0:
-                print(f'OperatingSystem ERR: No YubiKeys found. Add one first.')
-                return False
-            while True:
-                resp = input(f'OperatingSystem: Enter YubiKey ID or enter "-SHOW YUBIKEY IDs" to view all known YubiKey IDs > ')
-                
-        print(f'$ {RP.name}: Successfully logged in as "{username}". Access granted')
-    """
     def insert_yubikey(self, connection: Connection, account: str) -> Optional[YubiKey]:
         console.log('OperatingSystem').print(f' $OperatingSystem: Client({connection.client.name}) is requesting YubiKey authentication for account="{account}" on behalf of RP({connection.website.name})')
         console.log('OperatingSystem').post()

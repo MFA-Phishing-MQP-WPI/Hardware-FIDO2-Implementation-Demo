@@ -1,5 +1,5 @@
 # from util import YubiKey, is_signed, RelyingParty
-from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, Client, state_saved, cursor, edit_classes_pre_intialization, debug_mode, reinstating
+from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, Client, changes_made, cursor, edit_classes_pre_intialization, debug_mode, end_reinstating
 from typing import Dict, List, Optional
 import time
 import os
@@ -17,6 +17,10 @@ class Demo:
         self.visited_websites: List[str] = []
 
     def _display_inventory(self):
+
+        if changes_made():
+            print("\n  * WARNING: This state has unsaved changes *")
+
         print("\nINVENTORY:")
         print(f'\tYubiKeys          ({len(self.ykIDs)}) {self.ykIDs}')
         print(f'\tBrowsers          ({len(self.browsers)}) {self.browsers}')
@@ -79,12 +83,13 @@ class Demo:
                 elif action == 'save state':
                     self.save_state()
                     continue
-                elif action == 'exit' and not state_saved:
+                elif action == 'exit' and changes_made():
                     self.possible_save_state()
                 break
         except KeyboardInterrupt:
             print(f'\n>> {COLOR_CODES.WARN}WARNING: User has inturrupted the program{COLOR_CODES.RESET}')
-            self.possible_save_state()
+            if changes_made():
+                self.possible_save_state()
         print('Exiting...')
 
     def possible_save_state(self):
@@ -197,8 +202,6 @@ class Demo:
                 ConnectionAction.Show_Account_Tables,
                 ConnectionAction.View_Account_Info
             ]
-            global reinstating
-            reinstating = False
             while True:
                 action: str = self.get_action_from_portal(Portal)
                 if action == ConnectionAction.Close_Connection.name:
@@ -283,31 +286,10 @@ def main(
         context: Optional[RunContext], 
         _display_crypto_backend: bool, 
         _debug_mode: bool, 
-        _debug_challenge: bool):
+        _debug_challenge: bool,
+        _debug_yubikey: bool):
     global debug_mode
     debug_mode = _debug_mode
-    # yk = YubiKey(secret=b'\xad\x1d0\x9d\xaa\xa3\xea\xac\x8axj\x89-h\xabm\xa6-\xa8\xa2\xf8-\x94(\x8b\xed\x9an\x1e\xcb\x1b\xd6')
-    # pri, pub = yk._generate_key_pair('Microsoft', 'jdoe@wpi.edu')
-    # nonce = os.urandom(8)
-    # signature = yk.sign(nonce, pri)
-    # if is_signed(nonce, pub, signature):
-    #     print('Signature verified')
-    # else:
-    #     print('Signature not verified')
-    # Microsoft = RelyingParty('login.microsoft.com')
-    # Microsoft.add_account('Jacob')
-    # print(Microsoft.auth_user('Jacob', 'password'))
-    # Microsoft.add_account('Mark')
-    # Microsoft.add_account('Daniel')
-    # Microsoft.add_account('Anna', account_password='password123456')
-    # Microsoft.display_table()
-
-    # browser = 'Chome.exe'
-    # ui: OperatingSystem = OperatingSystem(RunContext.AUTO_DETECT)
-    # ykID: str = ui.new_YubiKey()
-    # ui.boot_client(client_name=browser)
-    # Microsoft_Portal: UserFacingConnection = ui.connect_to_internet(browser, 'login.microsoft.com')
-    # Microsoft_Portal.execute(ConnectionAction.CreateNewAccount)
     if _debug_mode and session:
         print(f'>> {COLOR_CODES.CLIENT_LOG}YUBIKEYS:{COLOR_CODES.RESET}')
         for YK_name, YK in session.OS.YubiKeys.items():
@@ -329,17 +311,21 @@ def main(
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: debug flags will be displayed{COLOR_CODES.RESET}')
     if _display_crypto_backend:
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: cryptographic backend will be displayed{COLOR_CODES.RESET}')
+    global edit_classes_pre_intialization
     if _debug_challenge:
         print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: you will be able to edit the values of the challenge before it is created{COLOR_CODES.RESET}')
-        global edit_classes_pre_intialization
         edit_classes_pre_intialization['Challenge'] = True
+    if _debug_yubikey:
+        print(f'>> {COLOR_CODES.CLIENT_LOG}SETTINGS: you will be able to edit the values of each yubikey before it is created{COLOR_CODES.RESET}')
+        edit_classes_pre_intialization['YubiKey'] = True
     if _debug_mode:
-        print(f'>> {COLOR_CODES.CLIENT_LOG_HIGHLIGHT}--debug: {COLOR_CODES.RESET}{COLOR_CODES.CLIENT_LOG} running on {running_on_shell()}{COLOR_CODES.RESET}')
+        print(f'\n>> {COLOR_CODES.CLIENT_LOG_HIGHLIGHT}--debug: {COLOR_CODES.RESET}{COLOR_CODES.CLIENT_LOG} running on {running_on_shell()}{COLOR_CODES.RESET}')
 
     if not session:
         if not context:
             context = RunContext.AUTO_DETECT
         session = Demo(context)
+    end_reinstating()
     session.update_backend_settings(_display_crypto_backend)
     session.run()
 
@@ -356,5 +342,11 @@ def generate_session_from_file(filename: Optional[str]) -> Optional[Demo]:
 if __name__ == "__main__":
     args = Parser(sys.argv[1:]).parse(legal_lengths=[1, 2, 3, 4, 5, 6])
     filename: Optional[str] = args['--launch-from-save']
-    main(generate_session_from_file(filename), RunContext.AUTO_DETECT, args['-display_crypto_backend'], args['-debug_mode'], args['-debug_challenge'])
+    main(
+        generate_session_from_file(filename), 
+        RunContext.AUTO_DETECT, 
+        args['-display_crypto_backend'], 
+        args['-debug_mode'], 
+        args['-debug_challenge'],
+        args['-debug_yubikey'])
     

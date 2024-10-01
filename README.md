@@ -85,26 +85,28 @@ For a more detailed exploration, use the `-all` flag to enable additional debug 
 python3 demo.py -all --launch-from-save saved_states/presentation.dump
 ```
 The -all flag activates the following options:
-* `-display_crypto_backend`: Displays detailed information about actions completed by the cryptographic backend, helping users understand how the encryption and signing processes work.
-* `-debug_mode`: Prints the value of all private keys at the runtime start, which is useful for those interested in the cryptographic details.
-* `-debug_challenge`: Allows you to edit the challenge values before they are sent to the YubiKey for authentication. This is especially useful for testing different scenarios, such as attempting to spoof the challenge from an incorrect Relying Party.
-* `-debug_yubikey`: Enables editing of the YubiKey’s internal values, giving the user more control over the authentication process.
+&nbsp;&nbsp; * `-display_crypto_backend`: Displays detailed information about actions completed by the cryptographic backend, helping users understand how the encryption and signing processes work.
+&nbsp;&nbsp; * `-debug_mode`: Prints the value of all private keys at the runtime start, which is useful for those interested in the cryptographic details.
+&nbsp;&nbsp; * `-debug_challenge`: Allows you to edit the challenge values before they are sent to the YubiKey for authentication. This is especially useful for testing different scenarios, such as attempting to spoof the challenge from an incorrect Relying Party.
+&nbsp;&nbsp;* `-debug_yubikey`: Enables editing of the YubiKey’s internal values, giving the user more control over the authentication process.
 
 These flags allow users to examine the authentication flow in depth and modify key components at runtime to simulate phishing attacks and RP mismatches.
 
 ### Demo Result
 ##### In the demo, you will observe how the system handles different login attempts:
-⚠️ **Successful Login with a Password**: For accounts like `jacob_glik`, which only require a password, you will be able to log in on both `login.microsoftonline.com` and the phishing site `attacker.vm`.
-✅ **Failure of Phishing Attempts with MFA**: For MFA-protected accounts like `craig`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `client` will prevent the `YubiKey` from signing the `challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `challenge` before passing it to the victim's `client`, the `YubiKey` will then generate the wrong `private key` and incorrectly sign the `challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
+
+&nbsp;&nbsp;⚠️ **Successful Login with a Password**: For accounts like `jacob_glik`, which only require a password, you will be able to log in on both `login.microsoftonline.com` and the phishing site `attacker.vm`.
+
+&nbsp;&nbsp;✅ **Failure of Phishing Attempts with MFA**: For MFA-protected accounts like `craig`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `client` will prevent the `YubiKey` from signing the `challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `challenge` before passing it to the victim's `client`, the `YubiKey` will then generate the wrong `private key` and incorrectly sign the `challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
 
 ### Exploring with `-debug_challenge` and `-debug_yubikey` Flags
 1. `-debug_challenge`:
-* This flag lets you intercept and edit the `challenge` creation process before it is sent to the `YubiKey` for authentication.
-* You can modify the values of the `challenge`, such as the `RP ID`, to see how the `YubiKey` generates a `private key` and how the `Relying Party` responds when the `signature` does not match the legitimate site.
-* This feature is especially useful if you want to simulate what happens when a `challenge` is sent from a different `relying party` or user during runtime, giving you control over the authentication flow.
+&nbsp;&nbsp; * This flag lets you intercept and edit the `challenge` creation process before it is sent to the `YubiKey` for authentication.
+&nbsp;&nbsp; * You can modify the values of the `challenge`, such as the `RP ID`, to see how the `YubiKey` generates a `private key` and how the `Relying Party` responds when the `signature` does not match the legitimate site.
+&nbsp;&nbsp; * This feature is especially useful if you want to simulate what happens when a `challenge` is sent from a different `relying party` or user during runtime, giving you control over the authentication flow.
 2. `-debug_yubikey`:
-* With this flag, you can edit the values used inside the `YubiKey` itself. This allows you to see how altering the `YubiKey`’s internal state would affect the authentication process.
-* By modifying the `YubiKey`’s behavior or values during runtime, you can explore different security scenarios and understand how the `YubiKey` protects against tampered or incorrect inputs.
+&nbsp;&nbsp; * With this flag, you can edit the values used inside the `YubiKey` itself. This allows you to see how altering the `YubiKey`’s internal state would affect the authentication process.
+&nbsp;&nbsp; * By modifying the `YubiKey`’s behavior or values during runtime, you can explore different security scenarios and understand how the `YubiKey` protects against tampered or incorrect inputs.
 
 The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiKey` (or other **hardware** security tokens) and `FIDO2` to protect against phishing attacks by preventing attestation `challenges` from unauthorized `Relying Parties`. By running the demo with the `-all` flag and exploring the `-debug_challenge` and `-debug_yubikey` flags, you can see how the system detects and stops phishing attempts, even when credentials are stolen. This detailed exploration of `YubiKey`'s anti-phishing mechanisms highlights why FIDO2 is a robust and secure MFA method.
 

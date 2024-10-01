@@ -74,16 +74,16 @@ These packages are automatically installed by running the demo if they aren't al
 ### Steps to Run
 1. Basic Run Command
 To start the demo using the saved system state `presentation.dump`, run the following command:
-```bash
-python3 demo.py --launch-from-save saved_states/presentation.dump
-```
+   ```bash
+   python3 demo.py --launch-from-save saved_states/presentation.dump
+   ```
 This will load the saved state where two Relying Parties (`login.microsoftonline.com` and `attacker.vm`) are set up, along with predefined user accounts such as `jacob_glik` and `craig`.
 
 2. Running with All Flags (`-all` flag)
 For a more detailed exploration, use the `-all` flag to enable additional debug and display features. This runs the demo with all available flags:
-```bash
-python3 demo.py -all --launch-from-save saved_states/presentation.dump
-```
+   ```bash
+   python3 demo.py -all --launch-from-save saved_states/presentation.dump
+   ```
 * The -all flag activates the following options:
    * `-display_crypto_backend`: Displays detailed information about actions completed by the cryptographic backend, helping users understand how the encryption and signing processes work.
    * `-debug_mode`: Prints the value of all private keys at the runtime start, which is useful for those interested in the cryptographic details.

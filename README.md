@@ -21,6 +21,10 @@
 9. [Already Implemented](#already-implemented)
 10. [Resources](#Resources)
 
+<br>
+
+<br>
+
 ## Overview
 
 This repository contains a Python-based demo that simulates FIDO2 authentication using a YubiKey-like hardware security token. The demo showcases the interaction between a client (browser), a relying party (web service), and a YubiKey in a typical two-factor authentication (2FA) flow.
@@ -39,6 +43,10 @@ This overview, along with the included examples, will help you understand how FI
 
 
 ---
+
+<br>
+
+<br>
 
 ## How to Run the Demo
 
@@ -78,6 +86,10 @@ These packages are automatically installed by running the demo if they aren't al
    ```bash
    python3 demo.py --launch-from-save state.dump
    ```
+
+<br>
+
+<br>
 
 ## FIDO2 MFA Usage Demo
 ##### The FIDO2 MFA Usage Demo is a comprehensive demonstration of how YubiKey and FIDO2 prevent phishing attacks by verifying the RelyingParty (RP) ID during the authentication process. This demo allows you to explore how authentication works when using a legitimate service (`login.microsoftonline.com`) and how phishing attempts from an attacker (`attacker.vm`) are thwarted.
@@ -120,6 +132,10 @@ These flags allow users to examine the authentication flow in depth and modify k
    2. By modifying the `YubiKey`’s behavior or values during runtime, you can explore different security scenarios and understand how the `YubiKey` protects against tampered or incorrect inputs.
 
 The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiKey` (or other **hardware** security tokens) and `FIDO2` to protect against phishing attacks by preventing attestation `challenges` from unauthorized `Relying Parties`. By running the demo with the `-all` flag and exploring the `-debug_challenge` and `-debug_yubikey` flags, you can see how the system detects and stops phishing attempts, even when credentials are stolen. This detailed exploration of `YubiKey`'s anti-phishing mechanisms highlights why FIDO2 is a robust and secure MFA method.
+
+<br>
+
+<br>
 
 ## Important Classes and Their Functions
 
@@ -173,6 +189,10 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
 * ##### `approve_mfa_registration_request()`: Approves MFA registration requests made by the relying party via the client.
 
 
+<br>
+
+<br>
+
 ## How the Demo Works
 
 1. Client Connection:
@@ -197,6 +217,10 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
    1. The relying party verifies the signature. If it’s correct, the user is granted a session token and successfully logged in.
 
 
+<br>
+
+<br>
+
 ## Visualizing Logs
 
 ###### The demo includes detailed color-coded print statements that explain each step of the process:
@@ -215,10 +239,18 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
 ###### The backend logging system provides verbose output of the cryptographic operations, user actions, and system decisions.
 
 
+<br>
+
+<br>
+
 ## Future Work
 ###### The following features will be added in future iterations:
 
 * Additional secure account actions, such as sending emails or viewing secure data.
+
+<br>
+
+<br>
 
 ## Troubleshooting
 ###### If the automatic package installation fails, you can manually install the required packages with:
@@ -226,6 +258,10 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
    ```bash
    pip install argon2-cffi cryptography colorama
    ```
+
+<br>
+
+<br>
 
 ## Already Implemented
 
@@ -244,6 +280,10 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
 #### ✔️ View Account Info
 #### ❌ Additional Secure Actions
 
+
+<br>
+
+<br>
 
 ## Resources
 

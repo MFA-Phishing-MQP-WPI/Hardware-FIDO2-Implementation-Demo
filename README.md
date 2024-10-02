@@ -25,7 +25,18 @@
 
 This repository contains a Python-based demo that simulates FIDO2 authentication using a YubiKey-like hardware security token. The demo showcases the interaction between a client (browser), a relying party (web service), and a YubiKey in a typical two-factor authentication (2FA) flow.
 
-The demo implements the core cryptographic challenge-response system used in FIDO2. In this system, a user logs into a website with a username and password (1FA) and authenticates using a YubiKey (MFA). This README explains the project's major components, how to run the demo, and key features such as MFA management and YubiKey interactions.
+The demo implements the core cryptographic challenge-response system used in FIDO2. In this system, a user logs into a website with a username and password (1FA) and authenticates using a YubiKey (MFA). This README explains the project's major components, how to run the demo, and key features such as MFA management, YubiKey interactions, and phishing-resistant authentication.
+
+### Key Features
+
+- **FIDO2 MFA Usage Demo**: Demonstrates the phishing-resistant nature of FIDO2 by simulating both legitimate and phishing login attempts. The demo shows how authentication is successfully completed for the legitimate relying party while thwarting phishing attempts by detecting mismatches in the RP ID.
+  
+- **Cryptographic Challenge-Response**: The system uses YubiKey’s challenge-response mechanism to securely authenticate users by validating a signed challenge with the legitimate relying party.
+
+- **Debug and Display Flags**: Explore detailed backend actions with flags like `-display_crypto_backend`, `-debug_mode`, `-debug_challenge`, and `-debug_yubikey`. These allow you to see cryptographic operations and even edit values during runtime to test different scenarios.
+  
+This overview, along with the included examples, will help you understand how FIDO2 and YubiKey technology works and why it's an effective defense against phishing attacks.
+
 
 ---
 

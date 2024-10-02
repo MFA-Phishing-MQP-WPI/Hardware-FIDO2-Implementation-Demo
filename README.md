@@ -116,7 +116,7 @@ These flags allow users to examine the authentication flow in depth and modify k
 
 ⚠️ &nbsp;&nbsp; **Successful Login with a Password**: For accounts like `jacob_glik`, which only require a password, you will be able to log in on both `login.microsoftonline.com` and the phishing site `attacker.vm`.
 
-✅ &nbsp;&nbsp; **Failure of Phishing Attempts with MFA**: For MFA-protected accounts like `craig`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `client` will prevent the `YubiKey` from signing the `challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `challenge` before passing it to the victim's `client`, the `YubiKey` will then generate the wrong `private key` and incorrectly sign the `challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
+↩️ &nbsp;&nbsp; **Failure of Phishing Attempts with MFA**: For MFA-protected accounts like `craig`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `client` will prevent the `YubiKey` from signing the `challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `challenge` before passing it to the victim's `client`, the `YubiKey` will then generate the wrong `private key` and incorrectly sign the `challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
 
 ### Exploring with `-debug_challenge` and `-debug_yubikey` Flags
 1. `-debug_challenge`:

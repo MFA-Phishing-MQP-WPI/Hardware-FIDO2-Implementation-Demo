@@ -3,9 +3,8 @@
 ## Table of Contents
 1. [Overview](#overview)
 2. [How to Run the Demo](#how-to-run-the-demo)
-   - [Prerequisites](#prerequisites)
-   - [Required Packages](#required-packages)
    - [Steps to Run](#steps-to-run)
+   - [Required Packages](#required-packages)
 3. [FIDO2 MFA Usage Demo](#FIDO2-MFA-Usage-Demo)
 4. [Important Classes and Their Functions](#important-classes-and-their-functions)
    - [UserInterface](#1-userinterface)
@@ -50,16 +49,6 @@ This overview, along with the included examples, will help you understand how FI
 
 ## How to Run the Demo
 
-### Prerequisites
-Here are the necessary Python packages. If you do not have them, the `package_manager.py` script will handle automatic installation for you.
-
-### Required Packages
-- `argon2-cffi`
-- `cryptography`
-- `colorama`
-
-These packages are automatically installed by running the demo if they aren't already available.
-
 ### Steps to Run
 1. **Clone the repository:**
 
@@ -86,6 +75,13 @@ These packages are automatically installed by running the demo if they aren't al
    ```bash
    python3 demo.py --launch-from-save state.dump
    ```
+
+### Required Packages
+- `argon2-cffi`
+- `cryptography`
+- `colorama`
+
+These packages are automatically installed by running the demo if they aren't already available.
 
 <br>
 

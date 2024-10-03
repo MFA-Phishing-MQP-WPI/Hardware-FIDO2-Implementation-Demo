@@ -1,5 +1,6 @@
 # from util import YubiKey, is_signed, RelyingParty
 from util import OperatingSystem, RunContext, UserFacingConnection, ConnectionAction, Client, changes_made, cursor, edit_classes_pre_intialization, debug_mode, end_reinstating
+from util import set_readline, start_compiler
 from typing import Dict, List, Optional
 import time
 import os
@@ -15,6 +16,8 @@ class Demo:
         self.ykIDs: List[str] = []
         self.connections: Dict[str, UserFacingConnection] = {}
         self.visited_websites: List[str] = []
+        set_readline([])
+        start_compiler()
 
     def _display_inventory(self):
 
@@ -42,6 +45,7 @@ class Demo:
             print(prefix)
             for i, option in enumerate(options):
                 print(f'\t{i+1}: {option}')
+            set_readline(options)
             inp = input(postfix).lower()
             try:
                 option_index = int(inp)
@@ -95,6 +99,7 @@ class Demo:
     def possible_save_state(self):
         try:
             print(f'>> {COLOR_CODES.WARN}WARNING: This state has unsaved changes!{COLOR_CODES.RESET}')
+            set_readline(['yes', 'no'])
             if input('Do you want to save the current state to a file? (Y/n) > ').lower() in ['y', 'yes']:
                 self.save_state()
         except KeyboardInterrupt:
@@ -112,9 +117,11 @@ class Demo:
                 RPs_str += f'<RelyingParty>{rp}</RelyingParty>\n'
 
             while True:
+                set_readline(['default.dump'])
                 name = input('Enter filedump name: ')
                 file = f'{name}.dump' if not name.endswith('.dump') else name
                 if os.path.exists(file):
+                    set_readline(['yes', 'no'])
                     if input(f'File({file}) already exists, override with current state (Y/n)? ').lower() in ['y', 'yes']:
                         break
                 else:
@@ -136,6 +143,7 @@ class Demo:
 
     def install_new_browser(self):
         try:
+            set_readline(['Chrome.exe', 'Edge.exe', 'Firefox.exe', 'Opera.exe', 'Safari.exe', 'Brave.exe', 'TorBrowser.exe'])
             browser = input("Enter browser name to install: ")
             self.OS.boot_client(client_name=browser)
             if browser not in self.browsers:
@@ -187,6 +195,7 @@ class Demo:
             client: Client = self.OS.boot_client(client_name=browser)
             website_name: str = self._webselect()
             if not website_name or website_name == 'new website':
+                set_readline(['login.microsoftonline.com', 'attacker.vm', 'wpi.edu', 'accounts.google.com', 'workday.com'])
                 website_name = input("Where would you like to connect to: ")
             Portal: UserFacingConnection = self.OS.connect_to_internet(browser, website_name)
             self.connections[f'{client.name}.connect({website_name})'] = Portal
@@ -263,6 +272,7 @@ class Demo:
         for rp in rps_tmp:
             rp.display_table(offset='\t')
         
+        set_readline(['yes', 'no'])
         if input(f'{Colors.CLEAR}>> {Colors.CYAN}Continue? (Y/n) > {Colors.MAGENTA}').lower() in ['y', 'yes']:
             print(Colors.CLEAR + '\n'*25)
             global state_saved

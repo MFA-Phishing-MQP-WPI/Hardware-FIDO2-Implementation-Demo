@@ -118,7 +118,7 @@ These flags allow users to examine the authentication flow in depth and modify k
 
 ### ⚠️ &nbsp;&nbsp; **Successful Login with a Password**: 
 
-For accounts like `PasswordOnly-User`, which only require a password, and accounts like `LastPass-User`, which requires MFA the form of Yubikey `OTP`, you will be able to log in on both `login.microsoftonline.com` and the phishing site `attacker.vm`.
+For accounts like `PasswordOnly-User` and `LastPass-User`, which only require a password or password and MFA in the form of OTP, you will be able to log in on both `login.microsoftonline.com` and the phishing site `attacker.vm` which simply acts as a middle man between the client and `login.microsoftonline.com`.
 
 ### 🕵 &nbsp;&nbsp; **Failure of Phishing Attempts with MFA**: 
 

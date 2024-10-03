@@ -124,7 +124,7 @@ For accounts like `PasswordOnly-User` and `LastPass-User`, which only require a 
 
 For MFA-protected accounts like `Craig`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `client` will prevent the `YubiKey` from signing the `challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `challenge` before passing it to the victim's `client`, the `YubiKey` will then generate the wrong `private key` and incorrectly sign the `challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
 
-### Exploring with `-debug_challenge` and `-debug_yubikey` Flags
+## Exploring with `-debug_challenge` and `-debug_yubikey` Flags
 1. `-debug_challenge`:
    1. This flag lets you intercept and edit the `challenge` creation process before it is sent to the `YubiKey` for authentication.
    2. You can modify the values of the `challenge`, such as the `RP ID`, to see how the `YubiKey` generates a `private key` and how the `Relying Party` responds when the `signature` does not match the legitimate site.

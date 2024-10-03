@@ -13,10 +13,13 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
+from yubico_client.yubico import Yubico
+import readline
 import time
 import datetime
 import string
 import random
+import json
 from enum import Enum
 from typing import Optional, List, Dict
 from display import Colors
@@ -42,6 +45,7 @@ edit_classes_pre_intialization: Dict[str, bool] = {
     'Challenge': False
 }
 
+CONFIG_FILE: str = "yubico_config.json"
 
 
 # SECTION::DEF begin class definitions
@@ -152,8 +156,10 @@ class YubiKey:
                 s = 'None' if not secret else f'"{bytes_to_base64(secret)}"'
                 question: str = f'         --dbuger YubiKey.__init__(ID="{ID}", secret={s}) override? (Y/n) > {Colors.MAGENTA}'
                 Colors.clear_display()
+                set_readline(['yes', 'no'])
                 console.log('Debugger_Override').post()
                 if input(question).lower() in ['y', 'yes']:
+                    set_readline([])
                     console.log('Debugger_Override').post()
                     ID = input(f'         --dbuger YubiKey.__init__(ID="{Colors.MAGENTA}')
                     Colors.clear_display()
@@ -166,6 +172,7 @@ class YubiKey:
                     console.log('Debugger_Override').print(f'         --OVERRIDE::YubiKey.__init__(ID="{ID}", secret={s})')
                     Colors.clear_display()
                     time.sleep(1)
+                set_readline([])
             except KeyboardInterrupt:
                 Colors.clear_display()
 
@@ -273,6 +280,64 @@ class YubiKey:
         return YubiKeyResponse(signature, nonce, self.ID)
     
     @staticmethod
+    def get_OTP() -> Optional[str]:
+        try:
+            set_readline([])
+            otp = input(f"YubiKey OTP > {Colors.CYAN}")
+            print(Colors.CLEAR, end='')
+            if len(otp) != 44:
+                print(f"{Colors.RED}Invalid OTP length. Please try again.{Colors.CLEAR}")
+                return None
+            return otp
+        except Exception as e:
+            print(Colors.CLEAR, end='')
+            raise e
+    @staticmethod
+    def validate_OTP(username: str, yubikey_identifier, otp: Optional[str] = None) -> bool:
+        try:
+            while not otp:
+                otp = YubiKey.get_OTP()
+            if len(otp) != 44:
+                print(f"{Colors.RED}Invalid OTP length. Please try again.{Colors.CLEAR}")
+                return False
+            yubikey_public_id = otp[:12]
+            if yubikey_public_id != yubikey_identifier:
+                print(f"{Colors.RED}YubiKey public ID does not match for user '{username}'.{Colors.CLEAR}")
+                return False
+            return YubiKey.verify_otp_origin(otp)
+        except KeyboardInterrupt:
+            return False
+        except Exception as e:
+            print(Colors.CLEAR, end='')
+            raise e
+    @staticmethod
+    def verify_otp_origin(otp: str) -> bool:
+        config = YubiKey.load_yubico_config()
+        yubico = Yubico(config["YUBICO_CLIENT_ID"], config["YUBICO_SECRET_KEY"])
+        try:
+            # Send the OTP to Yubico's validation service
+            if yubico.verify(otp):
+                print(f"{Colors.GREEN}YubiKey OTP is valid!{Colors.CLEAR}")
+                return True
+            else:
+                print(f"{Colors.RED}YubiKey OTP is invalid.{Colors.CLEAR}")
+                return False
+        except Exception as e:
+            print(f"{Colors.RED}YubiKey OTP is invalid.")
+            print(f"Error verifying YubiKey OTP: {e}")
+            print(Colors.CLEAR, end='')
+            return False
+
+    @staticmethod
+    def load_yubico_config():
+        """Load Yubico client ID and secret key from a config file."""
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as file:
+                return json.load(file)
+        else:
+            raise FileNotFoundError(f"{Colors.RED}Config file '{CONFIG_FILE}' not found.{Colors.CLEAR} Please add the Yubico API credentials.")
+
+    @staticmethod
     #   public_key_to_bytes(public_key: ec._EllipticCurvePublicKey) -> bytes:
     def public_key_to_bytes(public_key                            ) -> bytes:
         return public_key.public_bytes(
@@ -320,7 +385,8 @@ class YubiKey:
         return secret
     
 class Account:
-    def __init__(self, name: str, hash: Hasher, pk=None, pk_id: Optional[str] = None):
+    def __init__(self, name: str, hash: Hasher, pk=None, pk_id: Optional[str] = None, mfa: str = 'None'):
+        self.mfa_type: str = mfa # None, OTP, FIDO-2
         self.name: str = name
         self._hasher_object: Hasher = hash
         self.password_hash: str = ''
@@ -340,19 +406,24 @@ class Account:
         )
 
     def __str__(self) -> str:
-        if self.public_key:
-            return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=0x{YubiKey.public_key_to_bytes(self.public_key).hex()}<br-splitter>public_key_to_display={self.public_key_to_display}</Account>'
-        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=None<br-splitter>public_key_to_display=None</Account>'
+        if self.public_key and self.mfa_type.upper() == 'FIDO-2':
+            return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=0x{YubiKey.public_key_to_bytes(self.public_key).hex()}<br-splitter>public_key_to_display={self.public_key_to_display}<br-splitter>mfa_type=FIDO-2</Account>'
+        elif self.public_key:
+            return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>Yubico_ID={self.public_key}<br-splitter>public_key_to_display={self.public_key_to_display}<br-splitter>mfa_type=OTP</Account>'
+        return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=None<br-splitter>public_key_to_display=None<br-splitter>mfa_type=None</Account>'
 
     def __repr__(self) -> str:
         return self.__str__()
 
     @staticmethod
     def from_string(RP_name: str, account_string: str) -> 'Account':
+        otp: bool = 'mfa_type=OTP' in account_string
         username_pattern = r"Username=(.*?)<br-splitter>"
         password_pattern = r"Password=(.*?)<br-splitter>"
         public_key_pattern = r"public_key=(.*?)<br-splitter>"
-        public_key_to_display_pattern = r"<br-splitter>public_key_to_display=(.*?)</Account>"
+        if otp:
+            public_key_pattern = r"<br-splitter>Yubico_ID=(.*?)<br-splitter>"
+        public_key_to_display_pattern = r"<br-splitter>public_key_to_display=(.*?)<br-splitter>"
 
         # Extract the username, password hash, and public key using regex
         username_match = re.search(username_pattern, account_string)
@@ -367,9 +438,12 @@ class Account:
             print(f'{Colors.CYAN} --d for account={username} {public_key_match.group(1)=}'[:60] + f'{Colors.CLEAR}')
         pk_m = public_key_match.group(1) if public_key_match else None
         pk_v: Optional[str] = pk_m if pk_m != 'None' else None
-        public_key = YubiKey.bytes_to_public_key(
-            bytes.fromhex(pk_v[2:])
-        ) if pk_v else None
+        if not otp:
+            public_key = YubiKey.bytes_to_public_key(
+                bytes.fromhex(pk_v[2:])
+            ) if pk_v else None
+        else:
+            public_key = pk_v if pk_v else None
         public_key_to_display = public_key_to_display_match.group(1) if public_key_to_display_match else None
 
 
@@ -383,7 +457,12 @@ class Account:
             print(f'{account_string=}')
             print(f'{password_hash_str=}')
             raise ValueError('Invalid password hash group specified')
-        account: Account = Account(username, Hasher.from_hash_string(RP_name, password_hash_str), pk=public_key, pk_id=public_key_to_display)
+        mfa_type = 'None'
+        if 'mfa_type=OTP' in account_string:
+            mfa_type = 'OTP'
+        elif 'mfa_type=FIDO-2' in account_string:
+            mfa_type = 'FIDO-2'
+        account: Account = Account(username, Hasher.from_hash_string(RP_name, password_hash_str), pk=public_key, pk_id=public_key_to_display, mfa=mfa_type)
         return account
     @staticmethod
     def split(RP_name: str, s: str) -> List['Account']:
@@ -455,8 +534,10 @@ class Challenge:
             try:
                 question: str = f'         --dbuger Challenge.__init__(RP_name="{RP_name}", username="{username}", nonce="{bytes_to_base64(Nonce)}") override? (Y/n) > {Colors.MAGENTA}'
                 Colors.clear_display()
+                set_readline(['yes', 'no'])
                 console.log('Debugger_Override').post()
                 if input(question).lower() in ['y', 'yes']:
+                    set_readline([])
                     console.log('Debugger_Override').post()
                     RP_name = input(f'         --dbuger Challenge.__init__(RP_name="{Colors.MAGENTA}')
                     Colors.clear_display()
@@ -474,6 +555,7 @@ class Challenge:
                         console.log('Debugger_Override').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation {cursor[i%len(cursor)]}', end='\r')
                         if not reinstating: time.sleep(0.1)
                     console.log('Debugger_Override').print(f'         --OVERRIDE::RP.name("{RP_name}") for length of Challenge creation - success')
+                set_readline([])
             except KeyboardInterrupt:
                 Colors.clear_display()
                 return
@@ -493,7 +575,7 @@ class Challenge:
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'     Challenge(')
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         user={username}@{RP_name}, ')
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         SessionToken({token_1FA.ID}),')
-        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         Nonce(id={NonceID},')
+        console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         Nonce(id={NonceID}),')
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'         bytes_value={nonce_cut}')
         console.log('RelyingParty').print_backend(f'       $RP({RP_name}).', 'crypto_backend.ChallengeGen: ', f'     )')
         for i in range(16):
@@ -577,14 +659,96 @@ class RelyingParty:
             self.p(f'\tPassword Hash: {bytes_to_base64(acc.password_hash.encode("utf8"))}'[:100])
             self.p(f'\tPassword Salt: {acc.salt}')
             pub = 'None'
-            if acc.public_key:
+            if acc.mfa_type.upper() == 'FIDO-2' and acc.public_key:
                 pub = f'{YubiKey.public_key_to_bytes(acc.public_key)}'.replace("-----BEGIN PUBLIC KEY-----\n", "").replace("\n-----END PUBLIC KEY-----\n", "")
+            elif acc.public_key:
+                pub = f'YubiKeyID={acc.public_key}'
             self.p(f'\tPublic Key:    {pub}')
             return True
         except KeyboardInterrupt as ki:
             return False
 
-    def update_account_MFA(self, session: Optional[SessionToken]) -> bool:
+    def update_account_MFA(self, session: Optional[SessionToken], mfa_method: Optional[str] = None) -> Optional[bool]:
+        try:
+            console.log('RelyingParty').post()
+            set_readline(['OTP', 'FIDO-2'])
+            while not mfa_method:
+                resp = input(f'     $RP({self.name}): Register MFA type OTP or FIDO-2? > ')
+                if resp.upper() in ['OTP', 'FIDO-2']:
+                    set_readline([])
+                    mfa_method = resp.upper()
+                    break
+            if mfa_method == 'FIDO-2':
+                return self.update_account_MFA_FIDO2(session)
+            else:
+                return self.update_account_MFA_OTP(session)
+        except KeyboardInterrupt:
+            return None
+
+    def update_account_MFA_OTP(self, session: Optional[SessionToken]) -> bool:
+        global reinstating
+        try:
+            if not session or not session.is_valid(session.for_account, session.account_requires):
+                self.p(f'{session.for_account} as been inactive for too long.')
+                self.p(f'{session.for_account} has been logged out.')
+                return False
+            self.p(f'Enter your current password {Colors.CLEAR}', end='')
+            password: str = getpass.getpass(prompt='')
+            if not self.valid_login(session.for_account, password):
+                self.p(f'Incorrect password.')
+                return False
+            client: Client = session.by_connection.client
+            self.p(f'Sending request to Client({client.name})', end='\r')
+            if not reinstating: time.sleep(0.1)
+            self.p(f'Sending request to Client({client.name}) .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            self.p(f'Sending request to Client({client.name}) . .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            self.p(f'Sending request to Client({client.name}) . . .')
+            if not reinstating: time.sleep(0.05)
+
+            console.log('Client').print(f'   $Client({client.name}): Recieved request for OTP from RP({self.name})')
+            console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System . .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System . . .')
+            if not reinstating: time.sleep(0.05)
+
+            console.log('OperatingSystem').print(f' $OperatingSystem: Insert YubiKey into USB port')
+            console.log('OperatingSystem').print(f' $OperatingSystem: Press YubiKey when prompted . . .')
+
+            otp: Optional[str] = YubiKey.get_OTP()
+            if not otp:
+                console.log('OperatingSystem').print(f' $OperatingSystem: YubiKey OTP failed')
+                time.sleep(0.01)
+                console.log('Client').print(f'   $Client({client.name}): Failed to recieve OTP from Operating System . . .')
+                time.sleep(0.01)
+                self.p(f'Did not receive OTP from Client({client.name}) in time.')
+                self.p(f'"MFA add" attempt failed.')
+                return False
+            time.sleep(0.25)
+            console.log('OperatingSystem').print(f' $OperatingSystem: Sending YubiKey OTP({otp}) to Client({client.name})')
+            time.sleep(0.01)
+            console.log('Client').print(f'   $Client({client.name}): Received OTP({otp}) from Operating System')
+            console.log('Client').print(f'   $Client({client.name}): Sending YubiKey OTP to RP({self.name})')
+            time.sleep(0.01)
+            self.p(f'Received OTP({otp}) from Client({client.name})')
+            yubikey_identifier = otp[:12]
+            self.p(f'Registering Yubikey with ID({yubikey_identifier}) to user={session.for_account}@{self.name}')
+            self.accounts[session.for_account].public_key = yubikey_identifier
+            self.accounts[session.for_account].mfa_type = 'OTP'
+            self.p(f'Updated MFA method to "OTP" for user="{session.for_account}@{self.name}"')
+            self.show_table_question()
+            global state_saved
+            state_saved = False
+            return True
+        except KeyboardInterrupt as ki:
+            return False
+
+    def update_account_MFA_FIDO2(self, session: Optional[SessionToken]) -> bool:
         global reinstating
         try:
             if not session or not session.is_valid(session.for_account, session.account_requires):
@@ -627,8 +791,10 @@ class RelyingParty:
             if not reinstating: time.sleep(0.05)
             self.p(f'Recieved approval from Client({client.name})')
             self.accounts[session.for_account].public_key = approval.public_key
+            self.accounts[session.for_account].mfa_type = 'FIDO-2'
             self.accounts[session.for_account].public_key_to_display = f'YK({approval.YubiKeyID})'
             self.p(f'Updated user settings for user="{session.for_account}@{self.name}" to public_key="{bytes_to_base64(YubiKey.public_key_to_bytes(approval.public_key))}"')
+            self.p(f'Updated MFA method to "FIDO-2" for user="{session.for_account}@{self.name}"')
             self.show_table_question()
             global state_saved
             state_saved = False
@@ -671,6 +837,7 @@ class RelyingParty:
             console.log('Client').print(f'   $Client({client_name}): Let\'s create a new account!')
             if not reinstating: time.sleep(0.1)
             console.log('Client').post()
+            set_readline([])
             username = input(f'   $Client({client_name}): Enter your username > {Colors.CLEAR}')
             console.log('Client').print(f'   $Client({client_name}): Enter your password {Colors.CLEAR}', end='')
             password = getpass.getpass(prompt='')
@@ -697,9 +864,11 @@ class RelyingParty:
 
     def show_table_question(self):
         console.log(self.classname).post()
-        if input(f'{self.INDENT}$RP({self.name}): show table of all users (Y/n)? {Colors.CLEAR}').lower() in ['y', 'yes']:
+        set_readline(['yes', 'no', 'show tables'])
+        if input(f'{self.INDENT}$RP({self.name}): show table of all users (Y/n)? {Colors.CLEAR}').lower() in ['y', 'yes', 'show', 'show tables']:
             console.clear()
             self.display_table()
+        set_readline([])
         console.clear()
 
     def _add_token(self, account: str, token: SessionToken):
@@ -737,16 +906,21 @@ class RelyingParty:
             pretending = f' (pretending to be {self._pretending_to_be})'
         print(f"\n{offset}Relying Party '{self.name}'{pretending} accounts table:")
         dotted_line = '-' * (self._longest_account_length + 2)
-        seper = f'|{dotted_line}|---------------------------------------|-----------------------------|-------------|------------------------------|'
-        print(offset + '_' * len(seper))
-        print(f'{offset}| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA Secured |        MFA Public Key        |')
+        seper = f'|{dotted_line}|---------------------------------------|-----------------------------|----------|------------------------------|'
+        print(offset + '_' * len(seper))#                                                                                                                     MFA TYPE |  
+        print(f'{offset}| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA TYPE |        MFA Public Key        |')
         print(offset + seper)
         for account_name, account in self.accounts.items():
             username = account_name.center(self._longest_account_length)
-            MFA_Secured = '    YES    ' if account.public_key else '    NO     '
-            public_key = f'0x{YubiKey.public_key_to_bytes(account.public_key).hex()}'[:25] + '...' if account.public_key else '            None            '
+            MFA_TYPE = account.mfa_type.upper().center(8)
+            if account.public_key and account.mfa_type.upper() == 'FIDO-2':
+                public_key = f'{bytes_to_base64(YubiKey.public_key_to_bytes(account.public_key))}'[:25] + '...'
+            elif account.public_key:
+                public_key = f'YubiKeyID={account.public_key}'.center(28)
+            else:
+                public_key = '            None            '
             hash, salt = account._hasher_object.hash_str(display=False, _force=True).split(':')
-            print(f'{offset}| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {MFA_Secured} | {public_key} |')
+            print(f'{offset}| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {MFA_TYPE} | {public_key} |')
         print(offset + '‾' * len(seper))
         return True
     def _generate_token(self, account: str, hours: float, auth_type: str, required_auth_type: str, by_connection: 'Connection') -> SessionToken:
@@ -856,6 +1030,31 @@ class RelyingParty:
         console.log('RelyingParty').print(f"    $RP({self.name}): Revoked SessionToken(Type=1FA)    ")
         console.log('RelyingParty').print(f"    $RP({self.name}): MFA Failed.")
         return None
+    
+    def grant_session_token_MFA_using_OTP(
+            self, 
+            username: str, 
+            session: SessionToken, 
+            connection: 'Connection'
+            ) -> Optional[SessionToken]:
+        try:
+            if session.timmed_out():
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) timmed out')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Cannot grant MFA SessionToken to user with expired SessionToken')
+                return None
+            if not session.is_valid(username, '1FA'):
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is not valid for this user')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Cannot grant MFA SessionToken without a valid 1FA SessionToken')
+                return None
+            
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is valid for this user')
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Checking YubiKey OTP ...')
+            if not reinstating: time.sleep(0.2)
+            return SessionToken(session.for_account, 1, 'MFA', 'MFA', connection)
+        except KeyboardInterrupt as ki:
+            console.log('RelyingParty').print(f"    $RP({self.name}): MFA Inturrupted ... login failed")
+            console.log('RelyingParty').print(f"    $RP({self.name}): Revoked SessionToken(Type=1FA)")
+            return None
         
     def request_challenge(self, username: str, token: bytes, yk: YubiKey) -> Optional[Challenge]:
         self.p(f'Locating SessionToken(type=1FA) for user {username} that matches signature {token}')
@@ -875,10 +1074,12 @@ class RelyingParty:
             TK.add_nonce(nonce),
             nonce
         )
-    def requires_2FA(self, username: str) -> bool:
+    def requires_2FA(self, username: str, mfa_type: Optional[bool] = None) -> bool:
         if username not in self.accounts:
             raise ValueError(f'User "{username}" not found')
-        return not not self.accounts[username].public_key
+        if not mfa_type:
+            return not not self.accounts[username].public_key
+        return mfa_type.upper() == self.accounts[username].mfa_type.upper()
 
     @staticmethod
     def from_string(relying_party_string: str) -> 'RelyingParty':
@@ -893,6 +1094,9 @@ class RelyingParty:
         # rp.display_table()
         global WEBSITES
         WEBSITES[rp.name] = rp
+        length = 0
+        for account_name in rp.accounts.keys():
+                rp._longest_account_length = len(account_name) if len(account_name) > rp._longest_account_length else rp._longest_account_length
         return rp
         
         
@@ -921,13 +1125,15 @@ class Connection:
         self.session_token: Optional[SessionToken] = None
         self.UI_ptr: OperatingSystem = UI_ptr
 
-    def request_yubikey_insert_from_OS(self, username: str) -> Optional[int]:
+    def request_yubikey_insert_from_OS(self, username: str) -> Optional[YubiKey]:
         c_name: str = self.client.name
         rp_name: str = self.website.name
         console.log('Client').print(f'   $Client({c_name}): Got request from RP({rp_name}) for username: {username}@{rp_name} to enter YubiKey to request Challenge.')
         console.log('Client').print(f'   $Client({c_name}): Passing request to Operating System on behalf of RP({rp_name})...')
         if not reinstating: time.sleep(0.2)
         return self.UI_ptr.insert_yubikey(self, username)
+    
+    
 
     def request_yubikey_auth_from_OS(self, ykID: int, challenge: Challenge) -> YubiKeyResponse:
         n_short: str = f'{challenge.nonce}'[:12]
@@ -1022,7 +1228,9 @@ class Client:
                 console.log('Client').print(f'   $Client({self.name}): Sending login request to RP({RP.name})')
                 console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Requesting Tuple(Username, Password) from Client({self.name})')
                 console.log('Client').post()
+                set_readline(list(connection.website.accounts.keys()))
                 username = input(f'   $Client({self.name}): Enter username > {Colors.CLEAR}')
+                set_readline([])
                 console.log('Client').print(f'   $Client({self.name}): Enter password > {Colors.CLEAR}', end='')
                 password = getpass.getpass(prompt='')
                 secure_password = '*' * len(password)
@@ -1032,75 +1240,21 @@ class Client:
                     console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Username or Password incorrect. Access denied. (1FA Fail)')
                     console.log('Client').print(f'   $Client({self.name}): Recieved "HTTP 403" (Access denied) from RP({RP.name})')
                     console.log('Client').post()
+                    set_readline(['yes', 'no'])
                     if input(f'   $Client({self.name}): Try again? (Y/n) > {Colors.CLEAR}').lower() in ['y', 'yes']:
+                        set_readline([])
                         continue
+                    set_readline([])
                     return None
                 break
             console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} Username and password hash match...')
             if RP.requires_2FA(username):
                 console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} User="{username}@{RP.name}" requires 2FA...')
-                console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Sending request to client for user to insert and auth using YubiKey for the respective account...')
-                if not reinstating: time.sleep(0.1)
-                YK: Optional[YubiKey] = connection.request_yubikey_insert_from_OS(username)
-                if not YK:
-                    if not reinstating: time.sleep(1.2)
-                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} User="{username}@{RP.name}" timmed out')
-                    console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
-                    return None
-                challenge: Optional[Challenge] = RP.request_challenge(username, session_token, YK) # will print generating challenge
-                if not challenge:
-                    console.log('Client').print(f'   $Client({self.name}): Waiting ...')
-                    if not reinstating: time.sleep(1.5)
-                    console.log('Client').print(f'   $Client({self.name}): Request for "challenge request" timemed out')
-                    if not reinstating: time.sleep(1.2)
-                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Request for "challenge request" from usr="{username}" timmed out')
-                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Sending "{username}" back to main menu')
-                    return None
-                console.log('Client').print(f'   $Client({self.name}): Recieved challenge from RP({RP.name})')
-                console.log('Client').print(f'   $Client({self.name}): Verifying source of challenge . . .')
-                self.print_backend(f'Comunicating with: RP({RP.name})')
-                self.print_backend(f'Challenge signed by RP({challenge.RP_ID})')
-                if challenge.RP_ID != RP.name:
-                    self.print_backend(f'RP({RP.name}) != RP({challenge.RP_ID})')
-                    self.print_backend(f'THROW Exceptions.CryptographicBackend.UnknownRelyingParty')
-                    console.log('Client').print(f'   $Client({self.name}): {Colors.CLEAR}{Colors.BLUE_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.BLUE} Exceptions.CryptographicBackend.UnknownRelyingParty')
-                    console.log('Client').print(f'   $Client({self.name}): Failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
-                    space = ' ' * len(f'   $Client({self.name}): ')
-                    console.log('Client').print(f'{space}... ignoring challenge')
-                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} usr="{username}" timmed out')
-                    console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
-                    return None
-                self.print_backend(f'RP({RP.name}) == RP({challenge.RP_ID})')
-                console.log('Client').print(f'   $Client({self.name}): Successfully verified challenge sender as RP({RP.name}). Challenge originating ID matches communicating sub-domain.')
-                space = ' ' * len(f'   $Client({self.name}): ')
-                global cursor
-                for i in range(14):
-                    console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication {cursor[i%len(cursor)]}', end='\r')
-                    if not reinstating: time.sleep(0.1)
-                console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication  ')
-                console.log('YubiKey').print_backend(
-                    f'$YK({YK.ID})',  
-                    '.crypto_backend.authentic:', 
-                    f' Recieved Challenge from Operating System on behalf of Client on behalf of RP.')
-                console.log('YubiKey').print_backend(
-                    f'$YK({YK.ID})',  
-                    '.crypto_backend.authentic:', 
-                    f' Waiting for User to press YubiKey button to authenitcate')
-                console.log('OperatingSystem').post()
-                if input(f" $OperatingSystem: Press the YubiKey to authenticate? (Y/n) > {Colors.CLEAR}").lower() not in ['y', 'yes']:
-                    console.log('OperatingSystem').print(f' $OperatingSystem: Letting challenge time out...')
-                    if not reinstating: time.sleep(0.8)
-                    console.log('Client').print(f'   $Client({self.name}): Challenge timmed out...')
-                    console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Challenge timmed out...')
-                    return None
-                response: YubiKeyResponse = connection.request_yubikey_auth_from_OS(YK.ID, challenge)
-                console.log('OperatingSystem').print(f' $OperatingSystem: Receved YubiKey authentication in the form of a signed nonce.')
-                console.log('OperatingSystem').print(f' $OperatingSystem: Sending authentication to client({self.name})...')
-                if not reinstating: time.sleep(0.1)
-                console.log('Client').print(f"  $Client({self.name}): Recieved Yubikey auth from OS...")
-                console.log('Client').print(f"  $Client({self.name}): Passing Yubikey auth to RP...")
-                if not reinstating: time.sleep(0.1)
-                session_token: Optional[SessionToken] = RP.grant_session_token_MFA(username, session_token, response, connection)
+                if RP.requires_2FA(username, 'OTP'):
+                    session_token: Optional[SessionToken] = self.MFA_LOG_OTP(RP, forwarding, connection, username, session_token)
+                elif RP.requires_2FA(username, 'FIDO-2'):
+                    session_token: Optional[SessionToken] = self.MFA_LOG_FIDO2(RP, forwarding, connection, username, session_token)
+                
                 if not session_token:
                     console.log('Client').print(f'   $Client({self.name}): Recieved "HTML 403" as a response from RP({RP.name})')
                     return None
@@ -1113,6 +1267,131 @@ class Client:
             return None
         console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} Passing SessionToken({get_rand_id(18)}) to Client')
         return session_token
+
+    def MFA_LOG_OTP(self, RP: RelyingParty, forwarding: str, connection: Connection, username: str, session_token: SessionToken
+        ) -> Optional[SessionToken]:
+        global reinstating
+        client: Client = connection.client
+        RP.p(f'Sending request to Client({client.name})', end='\r')
+        if not reinstating: time.sleep(0.1)
+        RP.p(f'Sending request to Client({client.name}) .', end='\r')
+        if not reinstating: time.sleep(0.1)
+        RP.p(f'Sending request to Client({client.name}) . .', end='\r')
+        if not reinstating: time.sleep(0.1)
+        RP.p(f'Sending request to Client({client.name}) . . .')
+        if not reinstating: time.sleep(0.05)
+
+        console.log('Client').print(f'   $Client({client.name}): Recieved request for OTP from RP({self.name})')
+        console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System', end='\r')
+        if not reinstating: time.sleep(0.1)
+        console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System .', end='\r')
+        if not reinstating: time.sleep(0.1)
+        console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System . .', end='\r')
+        if not reinstating: time.sleep(0.1)
+        console.log('Client').print(f'   $Client({client.name}): Requesting OTP from Operating System . . .')
+        if not reinstating: time.sleep(0.05)
+
+        console.log('OperatingSystem').print(f' $OperatingSystem: Insert YubiKey into USB port')
+        console.log('OperatingSystem').print(f' $OperatingSystem: Press YubiKey when prompted . . .')
+
+        otp: Optional[str] = YubiKey.get_OTP()
+        if not otp:
+            console.log('OperatingSystem').print(f' $OperatingSystem: YubiKey OTP failed')
+            time.sleep(0.01)
+            console.log('Client').print(f'   $Client({client.name}): Failed to recieve OTP from Operating System . . .')
+            time.sleep(0.01)
+            RP.p(f'Did not receive OTP from Client({client.name}) in time.')
+            return None
+        time.sleep(0.25)
+        console.log('OperatingSystem').print(f' $OperatingSystem: Sending YubiKey OTP({otp}) to Client({client.name})')
+        time.sleep(0.01)
+        console.log('Client').print(f'   $Client({client.name}): Received OTP({otp}) from Operating System')
+        console.log('Client').print(f'   $Client({client.name}): Sending YubiKey OTP to RP({self.name})')
+        time.sleep(0.01)
+        RP.p(f'Received OTP({otp}) from Client({client.name})')
+        RP.p(f'Validating YubiKey OTP with ID={otp[:12]}...')
+        RP.p(f'Sending OTP to YubiCO for validation...')
+        time.sleep(0.25)
+        if not YubiKey.validate_OTP(username, RP.accounts[username].public_key, otp=otp):
+            console.log('RelyingParty').print(f"    $RP({self.name}): Cryptographic backend returned an error: Excations.Cryptographic_backend.OTP_ERROR")
+            global cursor
+            for i in range(10):
+                console.log('RelyingParty').print(f"    $RP({self.name}): Revoking SessionToken(Type=1FA) {cursor[i%len(cursor)]}", end='\r')
+            console.log('RelyingParty').print(f"    $RP({self.name}): Revoked SessionToken(Type=1FA)    ")
+            console.log('RelyingParty').print(f"    $RP({self.name}): MFA Failed.")
+            return None
+        return RP.grant_session_token_MFA_using_OTP(username, session_token, connection)
+
+    def MFA_LOG_FIDO2(
+            self, RP: RelyingParty, forwarding: str, connection: Connection, username: str, session_token: SessionToken
+        ) -> Optional[SessionToken]:
+        console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Sending request to client for user to insert and auth using YubiKey for the respective account...')
+        if not reinstating: time.sleep(0.1)
+        YK: Optional[YubiKey] = connection.request_yubikey_insert_from_OS(username)
+        if not YK:
+            if not reinstating: time.sleep(1.2)
+            console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} User="{username}@{RP.name}" timmed out')
+            console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
+            return None
+        challenge: Optional[Challenge] = RP.request_challenge(username, session_token, YK) # will print generating challenge
+        if not challenge:
+            console.log('Client').print(f'   $Client({self.name}): Waiting ...')
+            if not reinstating: time.sleep(1.5)
+            console.log('Client').print(f'   $Client({self.name}): Request for "challenge request" timemed out')
+            if not reinstating: time.sleep(1.2)
+            console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Request for "challenge request" from usr="{username}" timmed out')
+            console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Sending "{username}" back to main menu')
+            return None
+        console.log('Client').print(f'   $Client({self.name}): Recieved challenge from RP({RP.name})')
+        console.log('Client').print(f'   $Client({self.name}): Verifying source of challenge . . .')
+        self.print_backend(f'Comunicating with: RP({RP.name})')
+        self.print_backend(f'Challenge signed by RP({challenge.RP_ID})')
+        if challenge.RP_ID != RP.name:
+            self.print_backend(f'RP({RP.name}) != RP({challenge.RP_ID})')
+            self.print_backend(f'THROW Exceptions.CryptographicBackend.UnknownRelyingParty')
+            console.log('Client').print(f'   $Client({self.name}): {Colors.CLEAR}{Colors.BLUE_REVERSE}Caught Exception:{Colors.CLEAR}{Colors.BLUE} Exceptions.CryptographicBackend.UnknownRelyingParty')
+            console.log('Client').print(f'   $Client({self.name}): Failed to varify challenge sender as ({RP.name}). Challenge originating ID does not match communicating sub-domain. ')
+            space = ' ' * len(f'   $Client({self.name}): ')
+            console.log('Client').print(f'{space}... ignoring challenge')
+            console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} usr="{username}" timmed out')
+            console.log('Client').print(f'   $Client({self.name}): 2FA failed. Access denied.')
+            return None
+        self.print_backend(f'RP({RP.name}) == RP({challenge.RP_ID})')
+        console.log('Client').print(f'   $Client({self.name}): Successfully verified challenge sender as RP({RP.name}). Challenge originating ID matches communicating sub-domain.')
+        space = ' ' * len(f'   $Client({self.name}): ')
+        global cursor
+        for i in range(14):
+            console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication {cursor[i%len(cursor)]}', end='\r')
+            if not reinstating: time.sleep(0.1)
+        console.log('Client').print(f'{space}... passing challenge to operating system for YubiKey authentication  ')
+        console.log('YubiKey').print_backend(
+            f'$YK({YK.ID})',  
+            '.crypto_backend.authentic:', 
+            f' Recieved Challenge from Operating System on behalf of Client on behalf of RP.')
+        console.log('YubiKey').print_backend(
+            f'$YK({YK.ID})',  
+            '.crypto_backend.authentic:', 
+            f' Waiting for User to press YubiKey button to authenitcate')
+        console.log('OperatingSystem').post()
+        set_readline(['yes', 'no'])
+        if input(f" $OperatingSystem: Press the YubiKey to authenticate? (Y/n) > {Colors.CLEAR}").lower() not in ['y', 'yes']:
+            set_readline([])
+            console.log('OperatingSystem').print(f' $OperatingSystem: Letting challenge time out...')
+            if not reinstating: time.sleep(0.8)
+            console.log('Client').print(f'   $Client({self.name}): Challenge timmed out...')
+            console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} Challenge timmed out...')
+            return None
+        set_readline([])
+        response: YubiKeyResponse = connection.request_yubikey_auth_from_OS(YK.ID, challenge)
+        console.log('OperatingSystem').print(f' $OperatingSystem: Receved YubiKey authentication in the form of a signed nonce.')
+        console.log('OperatingSystem').print(f' $OperatingSystem: Sending authentication to client({self.name})...')
+        if not reinstating: time.sleep(0.1)
+        console.log('Client').print(f"  $Client({self.name}): Recieved Yubikey auth from OS...")
+        console.log('Client').print(f"  $Client({self.name}): Passing Yubikey auth to RP...")
+        if not response:
+            return None
+        if not reinstating: time.sleep(0.1)
+        return RP.grant_session_token_MFA(username, session_token, response, connection)
 
     def print_backend(self, message: str) -> None:
         print('       ', end='')
@@ -1195,6 +1474,22 @@ def bytes_to_base64(value: bytes) -> str:
 
 def base64_to_bytes(base64_string: str) -> bytes:
     return base64.urlsafe_b64decode(base64_string)
+
+__options__: list = []
+
+def set_readline(options: list):
+    global __options__
+    __options__ = options
+def __completer(text, state):
+    global __options__
+    matches = [option for option in __options__ if option.lower().startswith(text.lower())]
+    if state < len(matches):
+        return matches[state]
+    else:
+        return None
+def start_compiler():
+    readline.set_completer(__completer)
+    readline.parse_and_bind("tab: complete")
 
 
 class UserFacingConnection:
@@ -1287,7 +1582,9 @@ class OperatingSystem:
             console.log('OperatingSystem').print(f"{base_buff}\t {i + 1}. '{yk}'")
         console.log('OperatingSystem').print(f"{base_buff}\t {i + 2}. deny registration request")
         console.log('OperatingSystem').post()
+        set_readline(list(self.YubiKeys.keys()))
         inp = input(f" $OperatingSystem: Please select a YubiKey to approve (or {i + 2} to deny) > {Colors.CLEAR}")
+        set_readline([])
         yk_name: Optional[str] = None
         try:
             ichoice = int(inp)
@@ -1361,9 +1658,11 @@ class OperatingSystem:
         console.log('OperatingSystem').post()
         undesided: bool = True
         while undesided:
+            set_readline(['yes', 'no', 'Insert YubiKey', 'Deny Login Request'])
             resp = input(f' $OperatingSystem: Insert YubiKey or Deny Login Request (Y/n) > {Colors.CLEAR}')
             if 'Insert YubiKey'.lower().startswith(resp.lower()) or 'Deny Login Request'.lower().startswith(resp.lower()) or resp.lower() in ['y', 'yes', 'n', 'no']:
                 undesided = False
+                set_readline([])
         if 'Denny Login Request'.lower().startswith(resp.lower()) or resp.lower() in ['n', 'no']:
             return None
         while True:
@@ -1374,8 +1673,10 @@ class OperatingSystem:
             selectedYubiKey: Optional[YubiKey] = None
             selectedYubiKeyName: Optional[str] = None
             try:
+                set_readline(list(self.YubiKeys.keys()))
                 console.log('OperatingSystem').post()
                 resp = input(f' $OperatingSystem: Select YubiKey to insert > {Colors.CLEAR}')
+                set_readline([])
                 index = int(resp)
                 if index > 0 and index <= len(self.YubiKeys.keys()):
                     selectedYubiKeyName: str = list(self.YubiKeys.keys())[index - 1]
@@ -1391,11 +1692,14 @@ class OperatingSystem:
                         self.print_spinning_cursor(selectedYubiKeyName)
                         console.log('OperatingSystem').print(f' $OperatingSystem: YubiKey({selectedYubiKeyName}) inserted into computer...')
                         return selectedYubiKey
+                set_readline(['yes', 'no'])
                 console.log('OperatingSystem').post()
                 if input(f' $OperatingSystem: "{resp}" out of bounds and no such key starts with ("{resp}"), try again (Y/n)? {Colors.CLEAR}').lower() in ['y', 'yes']:
                     console.clear()
+                    set_readline([])
                     continue
                 console.clear()
+                set_readline([])
                 console.log('OperatingSystem').print(f" $OperatingSystem: You didn't enter a YubiKey in time!")
                 return None
     def print_spinning_cursor(self, selectedYubiKeyName: str):

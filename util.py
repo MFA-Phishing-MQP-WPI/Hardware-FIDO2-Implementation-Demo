@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
 from yubico_client.yubico import Yubico
+from terminal import running_on_PowerShell
 import readline
 import time
 import datetime
@@ -23,6 +24,9 @@ import json
 from enum import Enum
 from typing import Optional, List, Dict
 from display import Colors
+import pyotp
+import qrcode_terminal
+import qrcode
 
 
 
@@ -46,6 +50,7 @@ edit_classes_pre_intialization: Dict[str, bool] = {
 }
 
 CONFIG_FILE: str = "yubico_config.json"
+ISSUER_NAME: str = 'PhishingDemo'
 
 
 # SECTION::DEF begin class definitions
@@ -386,7 +391,7 @@ class YubiKey:
     
 class Account:
     def __init__(self, name: str, hash: Hasher, pk=None, pk_id: Optional[str] = None, mfa: str = 'None'):
-        self.mfa_type: str = mfa # None, OTP, FIDO-2
+        self.mfa_type: str = mfa # 'None', 'Auth App', 'OTP', 'FIDO-2'
         self.name: str = name
         self._hasher_object: Hasher = hash
         self.password_hash: str = ''
@@ -408,8 +413,10 @@ class Account:
     def __str__(self) -> str:
         if self.public_key and self.mfa_type.upper() == 'FIDO-2':
             return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=0x{YubiKey.public_key_to_bytes(self.public_key).hex()}<br-splitter>public_key_to_display={self.public_key_to_display}<br-splitter>mfa_type=FIDO-2</Account>'
-        elif self.public_key:
+        elif self.public_key and self.mfa_type.upper() == 'OTP':
             return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>Yubico_ID={self.public_key}<br-splitter>public_key_to_display={self.public_key_to_display}<br-splitter>mfa_type=OTP</Account>'
+        elif self.public_key:
+            return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>AuthenticatorAppSecret={self.public_key}<br-splitter>public_key_to_display={self.public_key_to_display}<br-splitter>mfa_type=AuthApp</Account>'
         return f'<Account>Username={self.name}<br-splitter>Password={self.password_hash}:{self.salt}<br-splitter>public_key=None<br-splitter>public_key_to_display=None<br-splitter>mfa_type=None</Account>'
 
     def __repr__(self) -> str:
@@ -418,11 +425,16 @@ class Account:
     @staticmethod
     def from_string(RP_name: str, account_string: str) -> 'Account':
         otp: bool = 'mfa_type=OTP' in account_string
+        otc: bool = 'mfa_type=AuthApp' in account_string
+        fido_or_none = not otp and not otc
+        print(f'\n\tDEBUGGER: {otp=}, {otc=}')
         username_pattern = r"Username=(.*?)<br-splitter>"
         password_pattern = r"Password=(.*?)<br-splitter>"
         public_key_pattern = r"public_key=(.*?)<br-splitter>"
         if otp:
             public_key_pattern = r"<br-splitter>Yubico_ID=(.*?)<br-splitter>"
+        elif otc:
+            public_key_pattern = r"<br-splitter>AuthenticatorAppSecret=(.*?)<br-splitter>"
         public_key_to_display_pattern = r"<br-splitter>public_key_to_display=(.*?)<br-splitter>"
 
         # Extract the username, password hash, and public key using regex
@@ -436,9 +448,10 @@ class Account:
         password_hash_str = password_match.group(1) if password_match else None
         if debug_mode:
             print(f'{Colors.CYAN} --d for account={username} {public_key_match.group(1)=}'[:60] + f'{Colors.CLEAR}')
+        print(f'\tDEBUGGER: {public_key_match=}')
         pk_m = public_key_match.group(1) if public_key_match else None
         pk_v: Optional[str] = pk_m if pk_m != 'None' else None
-        if not otp:
+        if fido_or_none:
             public_key = YubiKey.bytes_to_public_key(
                 bytes.fromhex(pk_v[2:])
             ) if pk_v else None
@@ -458,8 +471,10 @@ class Account:
             print(f'{password_hash_str=}')
             raise ValueError('Invalid password hash group specified')
         mfa_type = 'None'
-        if 'mfa_type=OTP' in account_string:
+        if otp:
             mfa_type = 'OTP'
+        elif otc:
+            mfa_type = 'Auth App'
         elif 'mfa_type=FIDO-2' in account_string:
             mfa_type = 'FIDO-2'
         account: Account = Account(username, Hasher.from_hash_string(RP_name, password_hash_str), pk=public_key, pk_id=public_key_to_display, mfa=mfa_type)
@@ -490,7 +505,8 @@ class SessionToken:
         self._data = data
         self._value_string = f'Account={self.for_account},atype={self.auth_type},expires={self._expires_on},nonce={self._data.hex()}'
         RP: RelyingParty = by_connection.website
-        console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Going to generate SessionToken with auth_type={self.auth_type} for user={account}@{RP.name}. Note: this user requires auth_type={auth_type_required}")
+        note = '' if auth_type_required == auth_type else f'Note: this user requires auth_type={auth_type_required}'
+        console.log('RelyingParty').print_backend(f'       $RP({RP.name}).', 'crypto_backend.SessionToken: ', f" Going to generate SessionToken with auth_type={self.auth_type} for user={account}@{RP.name}.{note}")
         global cursor
         global reinstating
         for i in range(12):
@@ -671,19 +687,65 @@ class RelyingParty:
     def update_account_MFA(self, session: Optional[SessionToken], mfa_method: Optional[str] = None) -> Optional[bool]:
         try:
             console.log('RelyingParty').post()
-            set_readline(['OTP', 'FIDO-2'])
+            set_readline(['Auth App', 'OTP', 'FIDO-2'])
             while not mfa_method:
-                resp = input(f'     $RP({self.name}): Register MFA type OTP or FIDO-2? > ')
-                if resp.upper() in ['OTP', 'FIDO-2']:
+                resp = input(f'     $RP({self.name}): Register MFA type: Auth App, OTP, or FIDO-2? > ')
+                if resp.upper() in ['AUTH APP', 'OTP', 'FIDO-2']:
                     set_readline([])
                     mfa_method = resp.upper()
                     break
             if mfa_method == 'FIDO-2':
                 return self.update_account_MFA_FIDO2(session)
-            else:
+            elif mfa_method == 'OTP':
                 return self.update_account_MFA_OTP(session)
+            else:
+                return self.update_account_MFA_Auth_App(session)
         except KeyboardInterrupt:
             return None
+
+    def update_account_MFA_Auth_App(self, session: Optional[SessionToken]) -> bool:
+        global reinstating
+        try:
+            global ISSUER_NAME
+            global state_saved
+            if not session or not session.is_valid(session.for_account, session.account_requires):
+                self.p(f'{session.for_account} as been inactive for too long.')
+                self.p(f'{session.for_account} has been logged out.')
+                return False
+            self.p(f'Enter your current password {Colors.CLEAR}', end='')
+            password: str = getpass.getpass(prompt='')
+            if not self.valid_login(session.for_account, password):
+                self.p(f'Incorrect password.')
+                return False
+            client: Client = session.by_connection.client
+            self.p(f'Sending request to Client({client.name})', end='\r')
+            if not reinstating: time.sleep(0.1)
+            self.p(f'Sending request to Client({client.name}) .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            self.p(f'Sending request to Client({client.name}) . .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            self.p(f'Sending request to Client({client.name}) . . .')
+            if not reinstating: time.sleep(0.05)
+
+            console.log('Client').print(f'   $Client({client.name}): Recieved request for Auth App MFA from RP({self.name})')
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System . .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System . . .')
+            if not reinstating: time.sleep(0.05)
+
+            console.log('OperatingSystem').print(f' $OperatingSystem: Scan the qr code and hit enter when ready or Ctrl+C to quit.')
+            qr: QR_Code = QR_Code.generate(session.for_account, issuer_name=ISSUER_NAME)
+            qr.display(confirm=True)
+            self.accounts[session.for_account].public_key = qr.get_secret()
+            self.accounts[session.for_account].mfa_type = 'Auth App'
+            state_saved = False
+            return True
+        except KeyboardInterrupt:
+            False
 
     def update_account_MFA_OTP(self, session: Optional[SessionToken]) -> bool:
         global reinstating
@@ -906,21 +968,23 @@ class RelyingParty:
             pretending = f' (pretending to be {self._pretending_to_be})'
         print(f"\n{offset}Relying Party '{self.name}'{pretending} accounts table:")
         dotted_line = '-' * (self._longest_account_length + 2)
-        seper = f'|{dotted_line}|---------------------------------------|-----------------------------|----------|------------------------------|'
-        print(offset + '_' * len(seper))#                                                                                                                     MFA TYPE |  
-        print(f'{offset}| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash'.center(37) + ' | ' + 'Password Salt'.center(27) + ' | MFA TYPE |        MFA Public Key        |')
+        seper = f'|{dotted_line}|---------------------------------------|-----------------------------|----------|----------------------------------------|'
+        print(offset + '_' * len(seper))#                                                                                                                     MFA TYPE |          Server-Side MFA Data  
+        print(f'{offset}| ' + 'Username'.center(self._longest_account_length) + ' | ' + 'Password Hash (base64)'.center(37) + ' | ' + 'Password Salt (base64)'.center(27) + ' | MFA TYPE |          Server-Side MFA Data          |')
         print(offset + seper)
         for account_name, account in self.accounts.items():
             username = account_name.center(self._longest_account_length)
-            MFA_TYPE = account.mfa_type.upper().center(8)
+            MFA_TYPE = account.mfa_type.upper().center(8)# if account.mfa_type != 'None' else 'N/A'
             if account.public_key and account.mfa_type.upper() == 'FIDO-2':
-                public_key = f'{bytes_to_base64(YubiKey.public_key_to_bytes(account.public_key))}'[:25] + '...'
+                public_key = f'PublicKey={bytes_to_base64(YubiKey.public_key_to_bytes(account.public_key))}'[:35] + '...'
+            elif account.public_key and account.mfa_type.upper() == 'OTP':
+                public_key = f'YubiKeyID={account.public_key}'.center(38)
             elif account.public_key:
-                public_key = f'YubiKeyID={account.public_key}'.center(28)
+                public_key = f'OTC_Secret={account.public_key}'[:35] + '...'
             else:
-                public_key = '            None            '
+                public_key = '          No Data Available           '
             hash, salt = account._hasher_object.hash_str(display=False, _force=True).split(':')
-            print(f'{offset}| {username} | {hash[:34]}... | 0x{salt.upper()[:22]}... | {MFA_TYPE} | {public_key} |')
+            print(f'{offset}| {username} | {str(bytes_to_base64(hash.encode()))[:34]}... | {str(bytes_to_base64(bytes.fromhex(salt.upper())))[:24]}... | {MFA_TYPE} | {public_key} |')
         print(offset + '‾' * len(seper))
         return True
     def _generate_token(self, account: str, hours: float, auth_type: str, required_auth_type: str, by_connection: 'Connection') -> SessionToken:
@@ -1031,6 +1095,31 @@ class RelyingParty:
         console.log('RelyingParty').print(f"    $RP({self.name}): MFA Failed.")
         return None
     
+    def grant_session_token_MFA_using_Auth_App(
+            self, 
+            username: str, 
+            session: SessionToken, 
+            connection: 'Connection'
+            ) -> Optional[SessionToken]:
+        try:
+            if session.timmed_out():
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) timmed out')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Cannot grant MFA SessionToken to user with expired SessionToken')
+                return None
+            if not session.is_valid(username, '1FA'):
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is not valid for this user')
+                console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Cannot grant MFA SessionToken without a valid 1FA SessionToken')
+                return None
+            
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is valid for this user')
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Granting MFA SessionToken to this user')
+            if not reinstating: time.sleep(0.2)
+            return SessionToken(session.for_account, 1, 'MFA', 'MFA', connection)
+        except KeyboardInterrupt as ki:
+            console.log('RelyingParty').print(f"    $RP({self.name}): MFA Inturrupted ... login failed")
+            console.log('RelyingParty').print(f"    $RP({self.name}): Revoked SessionToken(Type=1FA)")
+            return None
+
     def grant_session_token_MFA_using_OTP(
             self, 
             username: str, 
@@ -1050,6 +1139,7 @@ class RelyingParty:
             console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' SessionToken(id={session.ID}, type={session.auth_type}) is valid for this user')
             console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Checking YubiKey OTP ...')
             if not reinstating: time.sleep(0.2)
+            console.log('RelyingParty').print_backend(f'       $RP({self.name}).', 'crypto_backend.SessionToken: ', f' Granting MFA SessionToken to this user')
             return SessionToken(session.for_account, 1, 'MFA', 'MFA', connection)
         except KeyboardInterrupt as ki:
             console.log('RelyingParty').print(f"    $RP({self.name}): MFA Inturrupted ... login failed")
@@ -1250,7 +1340,9 @@ class Client:
             console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} Username and password hash match...')
             if RP.requires_2FA(username):
                 console.log(RP.classname).print(f'     $RP({RP.name}):{forwarding} User="{username}@{RP.name}" requires 2FA...')
-                if RP.requires_2FA(username, 'OTP'):
+                if RP.requires_2FA(username, 'Auth App'):
+                    session_token: Optional[SessionToken] = self.MFA_LOG_Auth_App(RP, forwarding, connection, username, session_token)
+                elif RP.requires_2FA(username, 'OTP'):
                     session_token: Optional[SessionToken] = self.MFA_LOG_OTP(RP, forwarding, connection, username, session_token)
                 elif RP.requires_2FA(username, 'FIDO-2'):
                     session_token: Optional[SessionToken] = self.MFA_LOG_FIDO2(RP, forwarding, connection, username, session_token)
@@ -1268,7 +1360,63 @@ class Client:
         console.log(RP.classname).print(f'{RP.INDENT}$RP({RP.name}):{forwarding} Passing SessionToken({get_rand_id(18)}) to Client')
         return session_token
 
-    def MFA_LOG_OTP(self, RP: RelyingParty, forwarding: str, connection: Connection, username: str, session_token: SessionToken
+    def MFA_LOG_Auth_App(
+            self, RP: RelyingParty, forwarding: str, connection: Connection, username: str, session_token: SessionToken
+        ) -> Optional[SessionToken]:
+        try:
+            global reinstating
+            client: Client = connection.client
+            RP.p(f'Sending request to Client({client.name})', end='\r')
+            if not reinstating: time.sleep(0.1)
+            RP.p(f'Sending request to Client({client.name}) .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            RP.p(f'Sending request to Client({client.name}) . .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            RP.p(f'Sending request to Client({client.name}) . . .')
+            if not reinstating: time.sleep(0.05)
+
+            console.log('Client').print(f'   $Client({client.name}): Recieved request for Auth App MFA from RP({self.name})')
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System . .', end='\r')
+            if not reinstating: time.sleep(0.1)
+            console.log('Client').print(f'   $Client({client.name}): Requesting Auth App MFA from Operating System . . .')
+            if not reinstating: time.sleep(0.05)
+
+            console.log('OperatingSystem').print(f' $OperatingSystem: Enter the six digit code on your authenticator when prompted')
+            chances: int = 3
+            correct_code = False
+            while chances > 0 and not correct_code:
+                console.log('OperatingSystem').post()
+                auth_app_OTC: str = input(f' $OperatingSystem: Enter the six digit code on your authenticator ({chances} left) > {Colors.CLEAR}')
+                if QR_Code.validate_code(RP.accounts[username].public_key, auth_app_OTC):
+                    correct_code = True
+                chances -= 1
+                self.send_code_message(RP, forwarding, connection, username, session_token, auth_app_OTC, correct_code)
+            return RP.grant_session_token_MFA_using_Auth_App(username, session_token, connection) if correct_code else None
+        except KeyboardInterrupt:
+            return None
+
+    def send_code_message(
+            self, RP: RelyingParty, forwarding: str, connection: Connection, username: str, session_token: SessionToken, code: str, approved: bool
+        ) -> None:
+        console.log('OperatingSystem').print(f' $OperatingSystem: Sending "{code}" to Client({self.name})')
+        console.log('Client').print(f'   $Client({self.name}): Received "{code}" from Operating System')
+        console.log('Client').print(f'   $Client({self.name}): Sending "{code}" to RP({RP.name})')
+        console.log('RelyingParty').print(f'     $RP({RP.name}): {forwarding} Received "{code}" from Client({self.name})')
+        global cursor
+        for i in range(12):
+            console.log('RelyingParty').print(f'     $RP({RP.name}): {forwarding} Validating Code="{code}" for user="{username}@{RP.name}" {cursor[i%len(cursor)]}', end='\r')
+            time.sleep(0.1)
+        if approved:
+            console.log('RelyingParty').print(f'     $RP({RP.name}): {forwarding} Validated Code="{code}" for user="{username}@{RP.name}"!  ')
+        else:
+            console.log('RelyingParty').print(f'     $RP({RP.name}): {forwarding} Failed to validate Code="{code}" for user="{username}@{RP.name}"!')
+
+    def MFA_LOG_OTP(
+            self, RP: RelyingParty, forwarding: str, connection: Connection, username: str, session_token: SessionToken
         ) -> Optional[SessionToken]:
         global reinstating
         client: Client = connection.client
@@ -1719,4 +1867,48 @@ class OperatingSystem:
             result.append(f'{yk}')
         return result
     
-        
+class QR_Code:
+    def __init__(self, provisioning_uri: str, username: str, issuer_name: str, secret):
+        self.provisioning_uri = provisioning_uri
+        self.username = username
+        self.issuer_name = issuer_name
+        self.secret = secret
+    
+    def get_secret(self):
+        return self.secret
+    
+    def display(self, confirm:bool=True):
+        self.display_on_powershell() if running_on_PowerShell() else self.display_on_bash()
+        if confirm: input("Press Enter once you've scanned the QR code to proceed...")
+
+    def display_on_bash(self):
+        qrcode_terminal.draw(self.provisioning_uri)
+
+    def display_on_powershell(self):
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=1,
+            border=0,
+        )
+        qr.add_data(self.provisioning_uri)
+        qr.make(fit=True)
+        qr_matrix = qr.get_matrix()
+        border_size = 4
+        size_with_border = len(qr_matrix) + 2 * border_size
+        bordered_matrix = [[False] * size_with_border for _ in range(size_with_border)]
+        for r in range(len(qr_matrix)):
+            for c in range(len(qr_matrix[r])):
+                bordered_matrix[r + border_size][c + border_size] = qr_matrix[r][c]
+        for row in bordered_matrix:
+            line = ''.join(['██' if cell else '  ' for cell in row])
+            print(line)
+
+    @staticmethod
+    def generate(username: str, issuer_name="Demo"):
+        totp_secret = pyotp.random_base32()
+        totp_uri = pyotp.totp.TOTP(totp_secret).provisioning_uri(username, issuer_name=issuer_name)
+        return QR_Code(totp_uri, username, issuer_name, totp_secret)
+    @staticmethod
+    def validate_code(totp_secret: str, authenticator_app_code: str) -> bool:
+        return pyotp.TOTP(totp_secret).verify(authenticator_app_code)

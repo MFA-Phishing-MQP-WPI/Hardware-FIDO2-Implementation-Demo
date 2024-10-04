@@ -122,7 +122,7 @@ For accounts like `PasswordOnly-User`, `AuthenticatorApp-User`, and `LastPass-Us
 
 ## 🕵 &nbsp;&nbsp; **Failure of Phishing Attempts with MFA**: 
 
-For MFA-protected accounts like `Secure-User`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `Client` will prevent the `YubiKey` from signing the `Challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `Challenge` before passing it to the victim's `Client`, the `YubiKey` will then generate the wrong `Private Key` and incorrectly sign the `Challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
+For FIDO2-MFA-protected accounts like `Secure-User`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `Client` will prevent the `YubiKey` from signing the `Challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `Challenge` before passing it to the victim's `Client`, the `YubiKey` will then generate the wrong `Private Key` and incorrectly sign the `Challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
 
 ## Exploring with `-debug_challenge` and `-debug_yubikey` Flags
 1. `-debug_challenge`:

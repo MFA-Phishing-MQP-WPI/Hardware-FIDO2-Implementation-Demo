@@ -4,7 +4,9 @@ from display import COLOR_CODES
 def unpack():
     print(f'{COLOR_CODES.CLIENT_LOG} <<< PACKAGE MANAGER :: VERIFYING ALL REQUIRED PACKAGES >>>{COLOR_CODES.RESET}', end='\r')
     installed_packages = [package.key for package in pkg_resources.working_set]
-    required_packages = ['argon2-cffi', 'cryptography', 'colorama', 'readline', 'yubico-client']
+    required_packages = [
+        'argon2-cffi', 'cryptography', 'colorama', 'readline', 'yubico-client', 'pyotp', 'qrcode', 'pillow', 'qrcode-terminal', 'qrcode'
+    ]
     for required_package in required_packages:
         if required_package not in installed_packages:
             print(f'\n\t{COLOR_CODES.CLIENT_LOG}{required_package} not installed. Installing...{COLOR_CODES.RESET}')

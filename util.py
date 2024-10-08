@@ -601,19 +601,20 @@ class Challenge:
 
 
 class RelyingParty:
-    def __init__(self, name: str, _pretending_to_be: Optional[str] = None):
-        self.name = name
-        self._pretending_to_be = self.name if not _pretending_to_be else _pretending_to_be
+    def __init__(self, name: str, _pretending_to_be: Optional[str] = None, __account_ptr: Optional[str] = None):
+        self.name: str = name
+        self._pretending_to_be: str = self.name if not _pretending_to_be else _pretending_to_be
+        self._account_ptr: Optional[str] = __account_ptr
         self.accounts: Dict[str, Account] = {}
-        self._longest_account_length = len('Username')  # used for displaying in table
+        self._longest_account_length: int = len('Username')  # used for displaying in table
         self.tokens: Dict[str, SessionToken] = {}
-        self.INDENT = "     "
-        self.classname = 'RelyingParty'
+        self.INDENT: str = "     "
+        self.classname: str = 'RelyingParty'
         self.p(f'initializing for the first time...')
         global Tracker
-        Tracker.append(self)
         global reinstating
         global state_saved
+        Tracker.append(self)
         if not reinstating: 
             time.sleep(0.2 + 0.05 * len(self.accounts.keys()))
             state_saved = False
@@ -1173,18 +1174,24 @@ class RelyingParty:
 
     @staticmethod
     def from_string(relying_party_string: str) -> 'RelyingParty':
+        global WEBSITES
         rp_dict: dict = RelyingParty.extract(relying_party_string)
         rp = RelyingParty(rp_dict['name'], _pretending_to_be=rp_dict['_pretending_to_be'])
         accounts: List[Account] = rp_dict['accounts']
-        for account in accounts:
-            rp.accounts[account.name] = account
-            rp.tokens[account.name] = []
+        ptr = rp_dict['account_pointer']
+        if not ptr:
+            for account in accounts:
+                rp.accounts[account.name] = account
+                rp.tokens[account.name] = []
+        else:
+            org_RP = WEBSITES[ptr]
+            rp.accounts = org_RP.accounts
+            rp.tokens = org_RP.tokens
+
             # print(f'Added account({account.name}) to RP({rp.name})')
         rp._longest_account_length = rp_dict['_longest_account_length']
         # rp.display_table()
-        global WEBSITES
         WEBSITES[rp.name] = rp
-        length = 0
         for account_name in rp.accounts.keys():
                 rp._longest_account_length = len(account_name) if len(account_name) > rp._longest_account_length else rp._longest_account_length
         return rp
@@ -1194,17 +1201,29 @@ class RelyingParty:
     @staticmethod
     def extract(s: str) -> dict:
         pattern = r'RelyingParty\((?P<name>.*?)\|\|SEPER\|\|_pretending_to_be=(?P<ptb>.*?)\)=\|\|STARTER\|\|(?P<accounts>.*?)\|\|SEPER\|\|(?P<_longest_account_length>\d+)\|\|ENDER\|\|'
+        basic: bool = True
+        if '||STARTER||AccountPTR=' in s:
+            basic = False
+            pattern = r'RelyingParty\((?P<name>.*?)\|\|SEPER\|\|_pretending_to_be=(?P<ptb>.*?)\)=\|\|STARTER\|\|AccountPTR=(?P<accountptr>.*?)\|\|SEPER\|\|(?P<_longest_account_length>\d+)\|\|ENDER\|\|'
         match = re.search(pattern, s)
         if not match:
             raise ValueError("String format doesn't match the expected pattern.\nstring=" + s)
         # Constructing the dictionary with the parsed values
         RP_name: str = match.group("name")
         RP_pretending_to_be: str = match.group("ptb")
+        longest_acc_name_length = int(match.group("_longest_account_length"))
+        if basic:
+            ptr = None
+            accounts = Account.split(RP_name, match.group("accounts"))
+        else:
+            ptr = match.group("accountptr")
+            accounts = []
         return {
             "name": RP_name,
             '_pretending_to_be': RP_pretending_to_be,
-            "accounts": Account.split(RP_name, match.group("accounts")),
-            "_longest_account_length": int(match.group("_longest_account_length"))
+            "account_pointer": ptr,
+            "accounts": accounts,
+            "_longest_account_length": longest_acc_name_length
         }
 
 

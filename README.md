@@ -124,6 +124,15 @@ For accounts like `PasswordOnly-User`, `AuthenticatorApp-User`, and `LastPass-Us
 
 For FIDO2-MFA-protected accounts like `Secure-User`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `Client` will prevent the `YubiKey` from signing the `Challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `Challenge` before passing it to the victim's `Client`, the `YubiKey` will then generate the wrong `Private Key` and incorrectly sign the `Challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
 
+## Microsoft Table:
+___________________________________________________________________________________________________________________________________________________
+|        Username       |         Password Hash (base64)        |    Password Salt (base64)   | MFA TYPE |          Server-Side MFA Data          |
+|-----------------------|---------------------------------------|-----------------------------|----------|----------------------------------------|
+|   PasswordOnly-User   | JGFyZ29uMmlkJHY9MTkkbT02NTUzNix0PT... | tepfX-Vap99Ea-7FmAYveadp... |   NONE   |           No Data Available            |
+| AuthenticatorApp-User | JGFyZ29uMmlkJHY9MTkkbT02NTUzNix0PT... | 4sX_YM7F6Z11AAywzJ_MFicz... | AUTH APP | OTC_Secret=DB7XGAIEPNCXPPB4YWKGVXEY... |
+|     LastPass-User     | JGFyZ29uMmlkJHY9MTkkbT02NTUzNix0PT... | hiDrdFyXh3hF62vJsGoW-Vb_... |   OTP    |         YubiKeyID=cccccbrvuujr         |
+|      Secure-User      | JGFyZ29uMmlkJHY9MTkkbT02NTUzNix0PT... | aZC8rWCW29Mwdt3BR9Ix8n3D... |  FIDO-2  | PublicKey=LS0tLS1CRUdJTiBQVUJMSUMgS... |
+
 ## Exploring with `-debug_challenge` and `-debug_yubikey` Flags
 1. `-debug_challenge`:
    1. This flag lets you intercept and edit the `Challenge` creation process before it is sent to the `YubiKey` for authentication.

@@ -1879,7 +1879,12 @@ class QR_Code:
     
     def display(self, confirm:bool=True):
         self.display_on_powershell() if running_on_PowerShell() else self.display_on_bash()
-        if confirm: input("Press Enter once you've scanned the QR code to proceed...")
+        if confirm: 
+            while not QR_Code.validate_code(
+                self.get_secret(), 
+                input('Enter the six digit code on your authenticator > ')
+            ):
+                print(" ! INCORRECT CODE ! \ntry again or KeyboardInterrupt\n")
 
     def display_on_bash(self):
         qrcode_terminal.draw(self.provisioning_uri)

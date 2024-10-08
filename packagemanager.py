@@ -1,11 +1,14 @@
 import pkg_resources
 import subprocess
 from display import COLOR_CODES
+from terminal import running_on_PowerShell
 def unpack():
     print(f'{COLOR_CODES.CLIENT_LOG} <<< PACKAGE MANAGER :: VERIFYING ALL REQUIRED PACKAGES >>>{COLOR_CODES.RESET}', end='\r')
     installed_packages = [package.key for package in pkg_resources.working_set]
     required_packages = [
         'argon2-cffi', 'cryptography', 'colorama', 'readline', 'yubico-client', 'pyotp', 'qrcode', 'pillow', 'qrcode-terminal', 'qrcode'
+    ] if not running_on_PowerShell() else [
+        'argon2-cffi', 'cryptography', 'colorama', 'pyreadline', 'yubico-client', 'pyotp', 'qrcode', 'pillow', 'qrcode-terminal', 'qrcode'
     ]
     for required_package in required_packages:
         if required_package not in installed_packages:

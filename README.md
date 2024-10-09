@@ -116,7 +116,7 @@ These flags allow users to examine the authentication flow in depth and modify k
 ## Demo Result
 ##### In the demo, you will observe how the system handles different login attempts:
 
-## ⚠️ &nbsp;&nbsp; **Successful Login with a Password**: 
+## ⚠️ &nbsp;&nbsp; **Successful Login with a Password and Non-FIDO2 MFA**: 
 
 For accounts like `PasswordOnly-User`, `AuthenticatorApp-User`, and `LastPass-User`, which only require a password or password and MFA in non-FIDO2 form, you will be able to log in on both `login.microsoftonline.com` and the phishing site `attacker.vm` which simply acts as a middle man between the client and the "real" RP (`login.microsoftonline.com`).
 

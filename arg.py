@@ -7,6 +7,7 @@ import os
 run_conditions: Dict[str, any] = {
     "--launch-from-save": None,
     "-display_crypto_backend": False,
+    '-fancy_display_location': False,
     '-help': False,
     '-debug_mode': False,
     '-debug_challenge': False,
@@ -18,6 +19,7 @@ help_runers: Tuple[Dict[str, str], Dict[str, Tuple[str, str]]] = (
     {
         '-help': 'prints this help message',
         '-display_crypto_backend': 'displays actions completd by the cryptographic backend',
+        '-fancy_display_location': 'displays RP name and username when login-context changes - please note the text is large',
         '-debug_mode': 'prints the value of all private keys at runtime start',
         '-debug_challenge': 'lets user edit the values that create the challenge before it is sent to YubiKey for authentication',
         '-debug_yubikey': 'lets user edit the values that create the YubiKey',

@@ -1,5 +1,8 @@
 import fix_colors
 from terminal import running_on_PowerShell
+import base64
+import datetime
+import os
 
 class VOID:
     @staticmethod
@@ -211,3 +214,86 @@ class MAGENTA:
     @staticmethod
     def err(s: str):
         print(f'{Colors.MAGENTA_REVERSE}{s}{Colors.CLEAR}')
+
+
+
+
+class Logger:
+    LOG_FILE: str = 'visual/log'
+    @staticmethod
+    def log(message: str):
+        if not os.path.exists(Logger.LOG_FILE):
+            open(Logger.LOG_FILE, 'w')
+        with open(Logger.LOG_FILE, 'a') as log:
+            log.write(f'{Colors.CYAN_GREY_HIGHLIGHT} [{datetime.datetime.now()}] {Colors.CLEAR}  {message}\n\n')
+
+
+class Logo:
+    LOGO_FILE: str = 'visual/logo.cutom'
+
+    @staticmethod
+    def read_logo_file() -> str:
+        with open(Logo.LOGO_FILE, 'rb') as f:
+            return base64.b64decode(f.read()).decode('utf-8')
+
+    @staticmethod
+    def display_logo():
+        logo = 'FIDO2 POC'
+        try:
+            logo = Logo.read_logo_file()
+        except FileNotFoundError:
+            Logger.log("*Logo missing*")
+        except Exception:
+            Logger.log("An error occurred while loading logo")
+        print(logo)
+
+    @staticmethod
+    def update_logo(new_logo: str) -> None:
+        with open(Logo.LOGO_FILE, 'wb') as f:
+            f.write(base64.b64encode(new_logo.encode('utf-8')))
+        Logger.log("Logo updated successfully")
+
+class Language:
+    display: bool = True
+    LETTER_HEIGHT: int = 6
+    ALPHABET_FILE: str = 'visual/alphabet.custom'
+    LETTERS: dict = {
+        key: base64.b64decode(value.encode()).decode() 
+        for (key, value) 
+        in [
+            (v.split(':', 1)) 
+            for v 
+            in open(ALPHABET_FILE, 'r').readlines() 
+            if v != ""
+        ]
+    }
+    @staticmethod
+    def to_alphabet(message: str, size: int) -> str:
+        overflow = ""
+        rows = [""] * Language.LETTER_HEIGHT
+        for ch in message.lower():
+            if ch in Language.LETTERS:
+                letter = Language.LETTERS[ch].split('\n')
+                if len(rows[0]) > size - 1 - Language.LETTER_HEIGHT:
+                    overflow += "\n".join(rows)
+                    rows = [""] * Language.LETTER_HEIGHT
+                rows = Language.fix_padding([row + letter[i] for i, row in enumerate(rows)])  
+        return overflow + "\n".join(rows)
+
+    @staticmethod
+    def fix_padding(rows: list) -> list:
+        max_len = max(len(row) for row in rows)
+        return [row + " " * (max_len - len(row)) for row in rows]
+    
+    @staticmethod
+    def terminal_size() -> int:
+        return os.get_terminal_size()[0]
+    
+    @staticmethod
+    def print_alphabet(message: str) -> None:
+        if Language.display:
+            print(Language.to_alphabet(message, Language.terminal_size()))
+
+    @staticmethod
+    def set_display(value: bool) -> None:
+        Language.display = value

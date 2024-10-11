@@ -6,8 +6,11 @@ import time
 import os
 import sys
 from arg import Parser
-from display import COLOR_CODES, Colors
+from display import COLOR_CODES, Colors, Logo, Language
 from terminal import running_on_shell
+
+just_logged_out: bool = False
+just_logged_in: bool = True
 
 class Demo:
     def __init__(self, context: RunContext):
@@ -64,6 +67,7 @@ class Demo:
 
     def run(self):
         try:
+            Logo.display_logo()
             while True:
                 self._display_inventory()
                 action = self._choose(
@@ -193,6 +197,7 @@ class Demo:
                 '  Enter the number of your choice > '
             )
             client: Client = self.OS.boot_client(client_name=browser)
+            Language.print_alphabet(client.name)
             website_name: str = self._webselect()
             if not website_name or website_name == 'new website':
                 set_readline(['login.microsoftonline.com', 'attacker.vm', 'wpi.edu', 'accounts.google.com', 'workday.com'])
@@ -211,6 +216,7 @@ class Demo:
                 ConnectionAction.Show_Account_Tables,
                 ConnectionAction.View_Account_Info
             ]
+            Language.print_alphabet(website_name)
             while True:
                 action: str = self.get_action_from_portal(Portal)
                 if action == ConnectionAction.Close_Connection.name:
@@ -234,10 +240,22 @@ class Demo:
         
         
     def get_action_from_portal(self, portal: UserFacingConnection) -> str:
+        global just_logged_out
+        global just_logged_in
         actions = [action.name for action in portal.available_actions(portal.connection.client, portal.connection.website)]
         action_header = f'Welcome to {portal.connection.website.name}! What action would you like to run?'
         if portal.is_logged_in():
-            action_header = f'Hello {portal.connection.session_token.for_account}@{portal.connection.website.name}! What action would you like to run:'
+            if just_logged_in:
+                Language.print_alphabet(portal.connection.session_token.for_account)
+                just_logged_in = False
+            action_header = f'\nWhat action would you like to run:'
+            just_logged_out = True
+        elif just_logged_out:
+            Language.print_alphabet(portal.connection.website.name)
+            just_logged_out = False
+            just_logged_in = True
+        else:
+            just_logged_in = True
         return self._choose(
             action_header,
             actions,
@@ -297,7 +315,8 @@ def main(
         _display_crypto_backend: bool, 
         _debug_mode: bool, 
         _debug_challenge: bool,
-        _debug_yubikey: bool):
+        _debug_yubikey: bool,
+        _fancy_display_location: bool):
     global debug_mode
     debug_mode = _debug_mode
     if _debug_mode and session:
@@ -337,6 +356,8 @@ def main(
         session = Demo(context)
     end_reinstating()
     session.update_backend_settings(_display_crypto_backend)
+    if not _fancy_display_location:
+        Language.set_display(False)
     session.run()
 
 
@@ -358,5 +379,6 @@ if __name__ == "__main__":
         args['-display_crypto_backend'], 
         args['-debug_mode'], 
         args['-debug_challenge'],
-        args['-debug_yubikey'])
+        args['-debug_yubikey'],
+        args['-fancy_display_location'])
     

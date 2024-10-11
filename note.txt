@@ -1,0 +1,13 @@
+https://patorjk.com/software/taag/#p=display&c=c%2B%2B&f=NScript&t=FIDO2%20POC
+https://patorjk.com/software/taag/#p=display&h=3&f=Doh&t=FIDO2%20POC
+https://patorjk.com/software/taag/#p=display&h=3&f=Epic&t=FIDO2%20POC
+https://patorjk.com/software/taag/#p=display&f=Tmplr&t=FIDO2%20POC
+
+Fonts:
+    Large:
+        NScript
+        Doh
+        Epic
+        Big Money-nw
+    Small:
+        Tmplr

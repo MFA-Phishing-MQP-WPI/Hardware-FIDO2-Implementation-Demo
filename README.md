@@ -107,6 +107,7 @@ For a more detailed exploration, use the `-all_flags` to enable additional debug
    ```
 * The -all flag activates the following options:
    * `-display_crypto_backend`: Displays detailed information about actions completed by the cryptographic backend, helping users understand how the encryption and signing processes work.
+   * `-fancy_display_location`: Displays RP name and username when login-context changes. Please note the text is large.
    * `-debug_mode`: Prints the value of all private keys at the runtime start, which is useful for those interested in the cryptographic details.
    * `-debug_challenge`: Allows you to edit the challenge values before they are sent to the YubiKey for authentication. This is especially useful for testing different scenarios, such as attempting to spoof the challenge from an incorrect Relying Party.
    * `-debug_yubikey`: Enables editing of the YubiKey’s internal values, giving the user more control over the authentication process.

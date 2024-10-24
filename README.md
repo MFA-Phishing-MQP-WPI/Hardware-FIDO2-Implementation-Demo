@@ -121,7 +121,7 @@ These flags allow users to examine the authentication flow in depth and modify k
 
 For accounts like `PasswordOnly-User`, `AuthenticatorApp-User`, and `LastPass-User`, which only require a password or password and MFA in non-FIDO2 form, you will be able to log in on both `login.microsoftonline.com` and the phishing site `attacker.vm` which simply acts as a middle man between the client and the "real" RP (`login.microsoftonline.com`).
 
-## 🕵 &nbsp;&nbsp; **Failure of Phishing Attempts with MFA**: 
+## 🕵 &nbsp;&nbsp; **Failure of Phishing Attempts with Hardware-FIDO2 MFA**: 
 
 For FIDO2-MFA-protected accounts like `Secure-User`, you will see that login works on `login.microsoftonline.com` but fails on `attacker.vm`. The `Client` will prevent the `YubiKey` from signing the `Challenge` from the phishing site, highlighting the phishing-resistant nature of FIDO2. Even if the `attacker.vm` changes the value of the `Relying Party` in the `Challenge` before passing it to the victim's `Client`, the `YubiKey` will then generate the wrong `Private Key` and incorrectly sign the `Challenge` leading to a decryption failure on the "real" `Relying Party` side. Blocking access to the attacker yet again.
 

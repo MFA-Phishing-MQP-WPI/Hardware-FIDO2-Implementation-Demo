@@ -146,7 +146,7 @@ ________________________________________________________________________________
    1. With this flag, you can edit the values used inside the `YubiKey` itself. This lets you see how altering the `YubiKey`’s internal state would affect the authentication process.
    2. By modifying the `YubiKey`’s behavior or values during runtime, you can explore different security scenarios and understand how the `YubiKey` protects against tampered or incorrect inputs.
 
-The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiKey` (or other **hardware** security tokens) and `FIDO2` to protect against phishing attacks by preventing attestation `challenges` from unauthorized `Relying Parties`. By running the demo with the `-all` flag and exploring the `-debug_challenge` and `-debug_yubikey` flags, you can see how the system detects and stops phishing attempts, even when credentials are stolen. This detailed exploration of `YubiKey`'s anti-phishing mechanisms highlights why FIDO2 is a robust and secure MFA method.
+The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiKey` (or other **hardware** security tokens) and `FIDO2` to protect against phishing attacks by preventing attestation `challenges` from unauthorized `Relying Parties`. By running the demo with the `-all_flags` flag and exploring the `-debug_challenge` and `-debug_yubikey` flags, you can see how the system detects and stops phishing attempts, even when credentials are stolen. This detailed exploration of `YubiKey`'s anti-phishing mechanisms highlights why FIDO2 is a robust and secure MFA method.
 
 <br>
 

@@ -77,11 +77,14 @@ This overview, along with the included examples, will help you understand how FI
    ```
 
 ### Required Packages
-- `argon2-cffi`
-- `cryptography`
-- `colorama`
-- `readline`
-- `yubico-client`
+* Bash (linux, cmd, mac)
+      ```bash
+      'argon2-cffi', 'cryptography', 'colorama', 'readline', 'yubico-client', 'pyotp', 'qrcode', 'pillow', 'qrcode-terminal', 'qrcode'
+      ```
+* PowerShell (windows)
+        ```ps
+        'argon2-cffi', 'cryptography', 'colorama', 'pyreadline', 'yubico-client', 'pyotp', 'qrcode', 'pillow', 'qrcode-terminal', 'qrcode'
+        ```
 
 These packages are automatically installed by running the demo if they aren't already available.
 

@@ -1,7 +1,7 @@
 import pkg_resources
 import subprocess
 from display import COLOR_CODES
-from terminal import running_on_PowerShell, is_running_on_mac
+from terminal import running_on_PowerShell, is_running_on_mac, is_externally_managed
 def unpack():
     print(f'{COLOR_CODES.CLIENT_LOG} <<< PACKAGE MANAGER :: VERIFYING ALL REQUIRED PACKAGES >>>{COLOR_CODES.RESET}', end='\r')
     installed_packages = [package.key for package in pkg_resources.working_set]
@@ -13,8 +13,13 @@ def unpack():
 
     install_command = ['python3', '-m', 'pip', 'install']  # Default command for Linux/Windows
     
-    if is_running_on_mac():  # If running on macOS, modify the installation command to use `venv`
-        install_command = [python_executable, '-m', 'venv', 'install']
+    # Detect macOS environment
+    if is_running_on_mac():  
+        install_command = ['python3', '-m', 'venv', 'install']  # Modify command for macOS if needed
+    
+    # Check if the environment is externally managed
+    if is_externally_managed():
+        install_command.append('--user')  # Use --user if system is externally managed
     
     for required_package in required_packages:
         if required_package not in installed_packages:

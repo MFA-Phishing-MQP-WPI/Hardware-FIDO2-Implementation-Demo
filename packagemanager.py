@@ -20,20 +20,30 @@ def unpack():
     
     # Check if the environment is externally managed
     if is_externally_managed():
-        # Recommend virtual environment creation if environment is externally managed
+        # Recommend virtual environment creation
         print(f"\n\t{COLOR_CODES.ERROR}This is an externally managed environment.{COLOR_CODES.RESET}")
-        print(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
+        print(f"\t{COLOR_CODES.WARNING}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
         
-        # Automatically create and activate a virtual environment
+        # Check if 'venv' module is available
+        if not shutil.which("python3 -m venv"):
+            print(f"\t{COLOR_CODES.ERROR}The python3-venv package is missing. Install it with:{COLOR_CODES.RESET}")
+            print("\tsudo apt install python3-venv")
+            sys.exit(1)  # Exit the script if venv is not installed
+        
         venv_dir = os.path.join(os.getcwd(), 'venv')
         if not os.path.exists(venv_dir):
             print(f"\t{COLOR_CODES.CLIENT_LOG}Creating virtual environment...{COLOR_CODES.RESET}")
-            subprocess.run(['python3', '-m', 'venv', venv_dir], check=True)
+            try:
+                subprocess.run(['python3', '-m', 'venv', venv_dir], check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"{COLOR_CODES.ERROR}Failed to create virtual environment: {e}{COLOR_CODES.RESET}")
+                print("Please install the `python3-venv` package and try again.")
+                sys.exit(1)
+        
         print(f"\t{COLOR_CODES.CLIENT_LOG}Activating virtual environment...{COLOR_CODES.RESET}")
         activate_venv = os.path.join(venv_dir, 'bin', 'activate')
         os.system(f"source {activate_venv}")
         
-        # Adjust install command to use virtual environment
         install_command = [os.path.join(venv_dir, 'bin', 'python'), '-m', 'pip', 'install']
     
     for required_package in required_packages:

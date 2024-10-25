@@ -21,7 +21,7 @@ def unpack():
     if is_externally_managed():
         # Recommend virtual environment creation if environment is externally managed
         print(f"\n\t{COLOR_CODES.ERROR}This is an externally managed environment.{COLOR_CODES.RESET}")
-        print(f"\t{COLOR_CODES.WARNING}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
+        print(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
         
         # Automatically create and activate a virtual environment
         venv_dir = os.path.join(os.getcwd(), 'venv')

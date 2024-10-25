@@ -1,8 +1,19 @@
 import pkg_resources
 import os
+import shutil
+import sys
 import subprocess
 from display import COLOR_CODES
 from terminal import running_on_PowerShell, is_running_on_mac, is_externally_managed
+
+def check_venv_module():
+    """Check if the venv module is available."""
+    try:
+        import venv
+        return True
+    except ImportError:
+        return False
+
 def unpack():
     print(f'{COLOR_CODES.CLIENT_LOG} <<< PACKAGE MANAGER :: VERIFYING ALL REQUIRED PACKAGES >>>{COLOR_CODES.RESET}', end='\r')
     installed_packages = [package.key for package in pkg_resources.working_set]
@@ -25,7 +36,7 @@ def unpack():
         print(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
         
         # Check if 'venv' module is available
-        if not shutil.which("python3 -m venv"):
+        if not check_venv_module():
             print(f"\t{COLOR_CODES.ERROR}The python3-venv package is missing. Install it with:{COLOR_CODES.RESET}")
             print("\tsudo apt install python3-venv")
             sys.exit(1)  # Exit the script if venv is not installed

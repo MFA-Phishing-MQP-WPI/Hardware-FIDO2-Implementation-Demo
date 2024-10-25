@@ -1,4 +1,5 @@
 import pkg_resources
+import os
 import subprocess
 from display import COLOR_CODES
 from terminal import running_on_PowerShell, is_running_on_mac, is_externally_managed

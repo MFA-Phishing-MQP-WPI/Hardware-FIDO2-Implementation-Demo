@@ -19,7 +19,21 @@ def unpack():
     
     # Check if the environment is externally managed
     if is_externally_managed():
-        install_command.append('--user')  # Use --user if system is externally managed
+        # Recommend virtual environment creation if environment is externally managed
+        print(f"\n\t{COLOR_CODES.ERROR}This is an externally managed environment.{COLOR_CODES.RESET}")
+        print(f"\t{COLOR_CODES.WARNING}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
+        
+        # Automatically create and activate a virtual environment
+        venv_dir = os.path.join(os.getcwd(), 'venv')
+        if not os.path.exists(venv_dir):
+            print(f"\t{COLOR_CODES.CLIENT_LOG}Creating virtual environment...{COLOR_CODES.RESET}")
+            subprocess.run(['python3', '-m', 'venv', venv_dir], check=True)
+        print(f"\t{COLOR_CODES.CLIENT_LOG}Activating virtual environment...{COLOR_CODES.RESET}")
+        activate_venv = os.path.join(venv_dir, 'bin', 'activate')
+        os.system(f"source {activate_venv}")
+        
+        # Adjust install command to use virtual environment
+        install_command = [os.path.join(venv_dir, 'bin', 'python'), '-m', 'pip', 'install']
     
     for required_package in required_packages:
         if required_package not in installed_packages:

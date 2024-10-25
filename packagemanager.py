@@ -22,7 +22,7 @@ def unpack():
     if is_externally_managed():
         # Recommend virtual environment creation
         print(f"\n\t{COLOR_CODES.ERROR}This is an externally managed environment.{COLOR_CODES.RESET}")
-        print(f"\t{COLOR_CODES.WARNING}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
+        print(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
         
         # Check if 'venv' module is available
         if not shutil.which("python3 -m venv"):

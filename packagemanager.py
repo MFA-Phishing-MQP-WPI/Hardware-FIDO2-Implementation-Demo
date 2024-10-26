@@ -5,7 +5,7 @@ except:
     # subprocess.run(['pip', 'install', 'setuptools'], check=True)
     # import pkg_resources
     print(f"\n\t{COLOR_CODES.ERROR}pkg_resources missing.{COLOR_CODES.RESET} (this is a built-in system library)")
-    print(f'Update base libraries by running: `pip install setuptools`')
+    print(f'\tUpdate base libraries by running: `pip install setuptools`')
     exit(1)
 import subprocess
 import os
@@ -106,9 +106,9 @@ def unpack():
                 if input("FOR DEBUG ONLY: See full error? (Y/n) > ").lower() in ['y', 'yes']:
                     raise e
                 print(f'\n\t{COLOR_CODES.CLIENT_LOG}Caught error (dependency missing) for package "readline".{COLOR_CODES.RESET}')
-                print('Please run the following and try again:')
-                print('\tsudo apt install libncurses5-dev libncursesw5-dev')
-                print('\tsudo apt install libncurses-dev')
+                print('\tPlease run the following and try again:')
+                print('\t\tsudo apt install libncurses5-dev libncursesw5-dev')
+                print('\t\tsudo apt install libncurses-dev')
     print(' ' * len(' <<< PACKAGE MANAGER :: VERIFYING ALL REQUIRED PACKAGES >>>'))
 
 

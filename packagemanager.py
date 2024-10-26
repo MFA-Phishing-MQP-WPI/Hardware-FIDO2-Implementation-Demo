@@ -84,6 +84,7 @@ def unpack():
         # install_command = [os.path.join(venv_dir, 'bin', 'python'), '-m', 'pip', 'install']
     elif is_running_in_virtualenv():
         print(f'\n\tVirtual environment detected...')
+        print(f'\t(you may leave the virtual environment anytime by running `deactivate`)')
     
     for required_package in required_packages:
         if required_package not in installed_packages:

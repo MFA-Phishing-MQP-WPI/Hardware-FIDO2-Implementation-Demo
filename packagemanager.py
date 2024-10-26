@@ -83,7 +83,7 @@ def unpack():
             exit(1)
         # install_command = [os.path.join(venv_dir, 'bin', 'python'), '-m', 'pip', 'install']
     elif is_running_in_virtualenv():
-        print(f'\tDetected virtual environment...')
+        print(f'\n\tVirtual environment detected...')
     
     for required_package in required_packages:
         if required_package not in installed_packages:
@@ -99,6 +99,15 @@ def unpack():
                     print(f'\t{COLOR_CODES.ERROR}Failed to install "{required_package}"{COLOR_CODES.RESET}  - maybe try pip install {required_package}?')
             except pkg_resources.DistributionNotFound:
                 raise Exception(f'\t{COLOR_CODES.ERROR_HEADER}Unable to install "{required_package}"{COLOR_CODES.RESET}')
+            except subprocess.CalledProcessError as e:
+                if required_package != 'readline':
+                    raise e
+                if input("FOR DEBUG ONLY: See full error? (Y/n) > ").lower() in ['y', 'yes']:
+                    raise e
+                print(f'\n\t{COLOR_CODES.CLIENT_LOG}Caught error (dependency missing) for package "readline".{COLOR_CODES.RESET}')
+                print('Please run the following and try again:')
+                print('\tsudo apt install libncurses5-dev libncursesw5-dev')
+                print('\tsudo apt install libncurses-dev')
     print(' ' * len(' <<< PACKAGE MANAGER :: VERIFYING ALL REQUIRED PACKAGES >>>'))
 
 

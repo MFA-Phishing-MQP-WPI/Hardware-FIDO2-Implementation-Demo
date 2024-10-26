@@ -33,12 +33,13 @@ def unpack():
     if is_externally_managed():
         # Recommend virtual environment creation
         print(f"\n\t{COLOR_CODES.ERROR}This is an externally managed environment.{COLOR_CODES.RESET}")
-        print(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
+        if input(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended. Continue? (Y/n) > {COLOR_CODES.RESET}").lower() not in ['y', 'yes']:
+            exit(1)
         
         # Check if 'venv' module is available
         if not check_venv_module():
-            print(f"\t{COLOR_CODES.ERROR}The python3-venv package is missing. Install it with:{COLOR_CODES.RESET}")
-            print("\tsudo apt install python3-venv")
+            print(f"\t{COLOR_CODES.ERROR}The python3-venv package is missing. Install it with:{COLOR_CODES.RESET} `sudo apt install python3-venv`")
+            # print("\tsudo apt install python3-venv")
             sys.exit(1)  # Exit the script if venv is not installed
         
         venv_dir = os.path.join(os.getcwd(), 'venv')
@@ -52,10 +53,19 @@ def unpack():
                 sys.exit(1)
         
         print(f"\t{COLOR_CODES.CLIENT_LOG}Activating virtual environment...{COLOR_CODES.RESET}")
-        activate_venv = os.path.join(venv_dir, 'bin', 'activate')
-        os.system(f"source {activate_venv}")
-        
-        install_command = [os.path.join(venv_dir, 'bin', 'python'), '-m', 'pip', 'install']
+        # activate_venv = os.path.join(venv_dir, 'bin', 'activate')
+        # os.system(f"source {activate_venv}")
+        result = subprocess.run(['python3', '-m', 'venv', '.venv'], check=True)
+        if result != 0:
+            print(f"\t{COLOR_CODES.ERROR}venv could not be created{COLOR_CODES.RESET} - maybe try `sudo apt install python3-venv`?")
+            exit(1)
+        result = subprocess.run(['source', '.venv/bin/activate'], check=True)
+        if result == 0:
+            print(f"\t{COLOR_CODES.OK}Started virtual environment successfully!{COLOR_CODES.RESET} To leave the virtual environment run `deactivate`")
+        else:
+            print(f"\t{COLOR_CODES.ERROR}Could not enter the virtual environment?{COLOR_CODES.RESET} - maybe try `source .venv/bin/activate`?")
+            exit(1)
+        # install_command = [os.path.join(venv_dir, 'bin', 'python'), '-m', 'pip', 'install']
     
     for required_package in required_packages:
         if required_package not in installed_packages:

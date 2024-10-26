@@ -24,6 +24,19 @@
 
 <br>
 
+```
+$$$$$$$$\ $$$$$$\ $$$$$$$\   $$$$$$\   $$$$$$\        $$$$$$$\   $$$$$$\   $$$$$$\
+$$  _____|\_$$  _|$$  __$$\ $$  __$$\ $$  __$$\       $$  __$$\ $$  __$$\ $$  __$$\
+$$ |        $$ |  $$ |  $$ |$$ /  $$ |\__/  $$ |      $$ |  $$ |$$ /  $$ |$$ /  \__|
+$$$$$\      $$ |  $$ |  $$ |$$ |  $$ | $$$$$$  |      $$$$$$$  |$$ |  $$ |$$ |
+$$  __|     $$ |  $$ |  $$ |$$ |  $$ |$$  ____/       $$  ____/ $$ |  $$ |$$ |
+$$ |        $$ |  $$ |  $$ |$$ |  $$ |$$ |            $$ |      $$ |  $$ |$$ |  $$\
+$$ |      $$$$$$\ $$$$$$$  | $$$$$$  |$$$$$$$$\       $$ |       $$$$$$  |\$$$$$$  |
+\__|      \______|\_______/  \______/ \________|      \__|       \______/  \______/
+```
+
+<br>
+
 ## Overview
 
 This repository contains a Python-based demo that simulates FIDO2 authentication using a YubiKey-like hardware security token. The demo showcases the interaction between a client (browser), a relying party (web service), and a YubiKey in a typical two-factor authentication (2FA) flow.

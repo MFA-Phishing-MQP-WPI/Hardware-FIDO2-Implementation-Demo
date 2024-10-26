@@ -1,8 +1,15 @@
-import pkg_resources
+try:
+    import pkg_resources
+except:
+    # subprocess.run(['pip', 'install', 'setuptools'], check=True)
+    # import pkg_resources
+    print(f"\n\t{COLOR_CODES.ERROR}pkg_resources missing.{COLOR_CODES.RESET} (this is a built-in system library)")
+    print(f'Update base libraries by running: `pip install setuptools`')
+    exit(1)
+import subprocess
 import os
 import shutil
 import sys
-import subprocess
 from display import COLOR_CODES
 from terminal import running_on_PowerShell, is_running_on_mac, is_externally_managed
 

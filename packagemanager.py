@@ -1,3 +1,4 @@
+from display import COLOR_CODES
 try:
     import pkg_resources
 except:
@@ -10,7 +11,6 @@ import subprocess
 import os
 import shutil
 import sys
-from display import COLOR_CODES
 from terminal import running_on_PowerShell, is_running_on_mac, is_externally_managed
 
 def check_venv_module():

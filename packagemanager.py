@@ -33,8 +33,7 @@ def unpack():
     if is_externally_managed():
         # Recommend virtual environment creation
         print(f"\n\t{COLOR_CODES.ERROR}This is an externally managed environment.{COLOR_CODES.RESET}")
-        if input(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended. Continue? (Y/n) > {COLOR_CODES.RESET}").lower() not in ['y', 'yes']:
-            exit(1)
+        print(f"\t{COLOR_CODES.WARN}Creating and using a virtual environment is recommended.{COLOR_CODES.RESET}")
         
         # Check if 'venv' module is available
         if not check_venv_module():
@@ -57,8 +56,9 @@ def unpack():
         # os.system(f"source {activate_venv}")
         result = subprocess.run(['python3', '-m', 'venv', '.venv'], check=True)
         if result != 0:
-            print(f"\t{COLOR_CODES.ERROR}venv could not be created{COLOR_CODES.RESET} - maybe try `sudo apt install python3-venv`?")
-            exit(1)
+            print(f"\t{COLOR_CODES.ERROR}Response from `python3 -m venv .venv` was non zero value 1.{COLOR_CODES.RESET}")
+            if input(f"\tContinue anyway? (Y/n) > ").lower() not in ['y', 'yes']:
+                exit(1)
         result = subprocess.run(['source', '.venv/bin/activate'], check=True)
         if result == 0:
             print(f"\t{COLOR_CODES.OK}Started virtual environment successfully!{COLOR_CODES.RESET} To leave the virtual environment run `deactivate`")

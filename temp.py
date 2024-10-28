@@ -1,10 +1,20 @@
 import sys
-import os
+import subprocess
 
 def is_externally_managed():
-    """Check if the environment is externally managed (PEP 668)."""
-    # PEP 668 environments are marked by an 'EXTERNALLY-MANAGED' file
-    return os.path.exists("/usr/share/python-wheels/EXTERNALLY-MANAGED") or os.path.exists("/etc/pep668/EXTERNALLY-MANAGED")
+    """Check if the environment is externally managed by attempting a pip install and checking for the externally-managed-environment error."""
+    try:
+        # Attempt a harmless `pip install` with a non-existent package to trigger environment check
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--dry-run", "nonexistent-package"],
+            capture_output=True,
+            text=True
+        )
+        # Check for the specific error message in the output
+        return "externally-managed-environment" in result.stderr
+    except Exception as e:
+        print(f"Error checking for externally managed environment: {e}")
+        return False
 
 def is_running_in_virtualenv():
     """

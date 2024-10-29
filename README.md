@@ -179,12 +179,16 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
 * ##### `insert_yubikey()`: Handles the user inserting their YubiKey.
 * ##### `YubiKey_auth()`: Simulates the challenge-response process with the YubiKey.
 
+<br>
+
 ### 2. Client
 
 ###### Simulates a browser (e.g., Chrome) interacting with websites and performing actions such as logging in.
 
 * ##### `connect()`: Establishes a connection between the client and a website.
 * ##### `_login_user()`: Manages the login process with username, password, and YubiKey authentication.
+
+<br>
 
 ### 3. RelyingParty
 
@@ -195,6 +199,8 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
 * ##### `grant_session_token_MFA()`: Validates the YubiKey challenge response and grants an MFA session token.
 * ##### `request_challenge()`: Generates a cryptographic challenge for the YubiKey during 2FA.
 
+<br>
+
 ### 4. YubiKey
 
 ###### Simulates a YubiKey security token, generating key pairs and signing challenges.
@@ -203,12 +209,16 @@ The [FIDO2 MFA Usage Demo](#-FIDO2-MFA-Usage-Demo) showcases the power of `YubiK
 * ##### `auth_2FA()`: Handles the challenge-response process by signing a nonce with the private key.
 * ##### `_sign()`: Signs a cryptographic challenge using the YubiKey's private key.
 
+<br>
+
 ### 5. SessionToken
 
 ###### Represents a session token issued by the relying party, granting access to a user.
 
 * ##### `is_valid()`: Checks if the token is still valid.
 * ##### `add_nonce()`: Adds a nonce (a unique, random number) for cryptographic challenges.
+
+<br>
 
 ### 6. OperatingSystem
 

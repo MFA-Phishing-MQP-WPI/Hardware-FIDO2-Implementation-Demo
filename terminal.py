@@ -7,13 +7,13 @@ import subprocess
 running_shell = None
 mycheck='/usr/bin/md5sum'
 
-def running_on_shell() -> str: 
-    if not os.path.isfile(mycheck):
-        return 'PowerShell'
-    else:
-        return 'Bash'
+# def running_on_shell() -> str: 
+#     if not os.path.isfile(mycheck):
+#         return 'PowerShell'
+#     else:
+#         return 'Bash'
 def running_on_PowerShell() -> bool:
-    return running_on_shell() == 'PowerShell'
+    return running_on_shell() == 'PowerShell / CMD-Bash'
 def is_running_on_mac() -> bool:
     return platform.system() == 'Darwin'
 def is_externally_managed():
@@ -56,3 +56,31 @@ def is_running_in_virtualenv():
     in_virtualenv = (hasattr(sys, 'real_prefix') or
                      (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
     return in_virtualenv
+
+def IVE():
+    """Check if the script is running inside a Python virtual environment."""
+    return (hasattr(sys, 'real_prefix') or
+            (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
+
+def running_on_shell():
+    """Identify the current shell environment."""
+    # Check for virtual environment or externally managed environment
+    if IVE() or is_externally_managed():
+        return "VM / venv"
+    
+    # Detect platform-specific shells
+    if platform.system() == "Windows":
+        # Differentiate between CMD and PowerShell
+        # if "PSModulePath" in os.environ or "PSExecutionPolicyPreference" in os.environ:
+        #     return "PowerShell"
+        # else:
+            return "PowerShell / CMD-Bash"
+    elif platform.system() == "Linux":
+        # Check if running in WSL
+        if 'microsoft' in platform.uname().release.lower():
+            return "WSL-Bash"  # WSL can be treated as Linux Bash
+        return "Linux-Bash"
+    elif platform.system() == "Darwin":
+        return "Mac-Bash"
+    else:
+        return "Unknown"

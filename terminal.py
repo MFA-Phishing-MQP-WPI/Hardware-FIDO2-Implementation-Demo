@@ -1,4 +1,5 @@
 import os
+import sys
 import platform
 import sysconfig
 
@@ -26,7 +27,7 @@ def is_externally_managed():
         # Check for the specific error message in the output
         return "externally-managed-environment" in result.stderr
     except Exception as e:
-        print(f"Error checking for externally managed environment: {e}")
+        # print(f"Error checking for externally managed environment: {e}")
         return False
 
 def is_running_in_VM():

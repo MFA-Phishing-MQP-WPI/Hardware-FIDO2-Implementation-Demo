@@ -82,6 +82,9 @@ This overview, along with the included examples, will help you understand how FI
 * ##### `-display_crypto_backend`: Display cryptographic backend actions.
 * ##### `-debug_mode`: Print the values of private keys at runtime start.
 * ##### `-help`: Display help and usage information.
+* ##### `-debug_challenge`: Intercepts the Challenge while it's being created and lets you edit its contents.
+* ##### `-debug_yubikey`: Intercepts the YubiKey while it's being created and lets you edit its contents.
+* ##### `-all_flags`: Activates all flags (not `-help` flag).
 
 ###### Sample Usage:
 

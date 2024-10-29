@@ -329,10 +329,15 @@ def main(
         for website in Tracker:
             print(f' {COLOR_CODES.CLIENT_LOG}     {website.name}{COLOR_CODES.RESET}')
             for name, account in website.accounts.items():
-                yks = 'account.public_key=None'
-                if account.public_key:
+                yks = 'account.mfa=None'
+                if account.mfa_type == 'FIDO-2':
                     pub = f'{YubiKey.public_key_to_bytes(account.public_key)}'
-                    yks = f'account.public_key={pub}'
+                    yks = f'account.mfa.public_key={pub}'
+                elif account.mfa_type == 'OTP':
+                    yks = f'account.mfa.YubiKey.ID={account.public_key}'
+                elif account.mfa_type == 'Auth App':
+                    yks = f'account.mfa.Authenticator.secrete_key={account.public_key}'
+
                 print(f'\t {COLOR_CODES.CLIENT_LOG}      {name}, {account.password_hash}{COLOR_CODES.RESET}')
                 print(f'\t {COLOR_CODES.CLIENT_LOG}      {account.salt}{COLOR_CODES.RESET}')
                 print(f'\t {COLOR_CODES.CLIENT_LOG}      {yks}{COLOR_CODES.RESET}\n')

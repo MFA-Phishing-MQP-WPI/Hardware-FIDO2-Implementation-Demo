@@ -28,7 +28,8 @@ def is_externally_managed():
     except Exception as e:
         print(f"Error checking for externally managed environment: {e}")
         return False
-def is_running_in_virtualenv():
+
+def is_running_in_VM():
     """
     Determine if the script is running in a Python virtual environment
     or in an externally managed system environment.
@@ -42,4 +43,14 @@ def is_running_in_virtualenv():
         return True
 
     # Return True only if we're actually in a virtual environment or managed system
+    return in_virtualenv
+
+def is_running_in_virtualenv():
+    """
+    Determine if the script is running in a Python virtual environment
+    or in an externally managed system environment.
+    """
+    # Check for Python virtual environment
+    in_virtualenv = (hasattr(sys, 'real_prefix') or
+                     (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
     return in_virtualenv

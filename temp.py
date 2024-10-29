@@ -1,20 +1,6 @@
-import os
 import sys
-import platform
-import sysconfig
+import subprocess
 
-running_shell = None
-mycheck='/usr/bin/md5sum'
-
-def running_on_shell() -> str: 
-    if not os.path.isfile(mycheck):
-        return 'PowerShell'
-    else:
-        return 'Bash'
-def running_on_PowerShell() -> bool:
-    return running_on_shell() == 'PowerShell'
-def is_running_on_mac() -> bool:
-    return platform.system() == 'Darwin'
 def is_externally_managed():
     """Check if the environment is externally managed by attempting a pip install and checking for the externally-managed-environment error."""
     try:
@@ -27,10 +13,10 @@ def is_externally_managed():
         # Check for the specific error message in the output
         return "externally-managed-environment" in result.stderr
     except Exception as e:
-        # print(f"Error checking for externally managed environment: {e}")
+        print(f"Error checking for externally managed environment: {e}")
         return False
 
-def is_running_in_VM():
+def _is_running_in_virtualenv():
     """
     Determine if the script is running in a Python virtual environment
     or in an externally managed system environment.
@@ -55,3 +41,20 @@ def is_running_in_virtualenv():
     in_virtualenv = (hasattr(sys, 'real_prefix') or
                      (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
     return in_virtualenv
+
+def main():
+    # if is_running_in_virtualenv():
+    #     print("Running inside a Python virtual environment or externally managed environment.")
+    # else:
+    #     print("Not running inside a virtual environment or an externally managed environment.")
+    if is_externally_managed():
+        print("1. Externally managed")
+    else:
+        print("1. Not Mangaed")
+    if is_running_in_virtualenv():
+        print("2. is running virtually")
+    else:
+        print("2. is not running virtually")
+    
+
+main()

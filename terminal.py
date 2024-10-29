@@ -2,6 +2,7 @@ import os
 import sys
 import platform
 import sysconfig
+import subprocess
 
 running_shell = None
 mycheck='/usr/bin/md5sum'

@@ -89,7 +89,7 @@ This overview, along with the included examples, will help you understand how FI
 ###### Sample Usage:
 
    ```bash
-   python3 demo.py --launch-from-save state.dump
+   python3 demo.py --launch-from-save saved_states/presentation.dump
    ```
 
 ### Required Packages
